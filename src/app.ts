@@ -13,7 +13,6 @@ export const corsOptions = {
   origin: [
     "http://localhost:3000",
     "http://localhost:3001",
-    "https://how-s-front-end.vercel.app",
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"],
