@@ -1,6 +1,6 @@
 // datasource and generator setup
 datasource db {
-  provider = "mysql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
@@ -8,370 +8,95 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// ** User Model **
+// ---------------------------------------------------------
+//  ENUMS
+// ---------------------------------------------------------
+
+enum UserRole {
+  STUDENT
+  BROKER
+  PARTNER
+  ADMIN
+  SUPER_ADMIN
+}
+
+// ---------------------------------------------------------
+//  MODEL
+// ---------------------------------------------------------
+
 model User {
-  id           Int        @id @default(autoincrement())
-  email        String     @unique
-  password     String?
-  role         UserRole
-  userStatus   UserStatus
-  profileImage String?
-  isDeleted    Boolean    @default(false)
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  firstName   String
+  lastName    String?
+  phoneNumber String?
+  email       String   @unique
+  password    String
+  role        UserRole @default(STUDENT)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  otp        String?
-  otpExpiry  DateTime?
-  identifier String?
-
-  helper       Helper?
-  customer     Customer?
-  admin        Admin?
-  bankAccounts BankAccount[]
-  cards        Card[]
+  brokers   Broker?
+  partners  Partner?
+  students  Student?
+  admins    Admin?
 
   @@map("users")
 }
 
-// ** Helper Model **
-model Helper {
-  id       Int    @id @default(autoincrement())
-  helperId String @unique
-  stripeAccountId String?
+model Broker {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  firstName String
-  lastName  String?
+  email String @unique
+  user  User   @relation(fields: [email], references: [email])
 
-  checkType         CheckType
-  // checktype = individual
-  ssnId             String?
-  // checktype = business
-  businessLegalName String?
-  einTexId          String?
-
-  email           String  @unique
-  phoneNumber     String
-  address         String
-  apartment       String
-  city            String
-  state           String
-  zipCode         String
-  serviceLocation String
-  serviceType     String
-  licenseImage    String?
-  insurenceImage  String?
-
-  enableTextMessages         Boolean @default(true)
-  sendEmails                 Boolean @default(true)
-  enableRealTimeNotification Boolean @default(true)
-
-  totalEarnings Decimal @default(0) @db.Decimal(10, 2)
+  agency        String?
+  licenseNumber String?
+  webHostedUrl  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [email], references: [email])
-
-  orders   Order[]   @relation(name: "HelperOrders")
-  payments Payment[]
-
-  chat       Chat[]
-  freeVisits FreeVisit[]
-
-  @@map("helpers")
+  @@map("brokers")
 }
 
-// ** Customer Model **
-model Customer {
-  id         Int    @id @default(autoincrement())
-  customerId String @unique
-  stripeCustomerId String?
+model Partner {
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  email String @unique
+  user  User   @relation(fields: [email], references: [email])
 
-  firstName   String
-  lastName    String?
-  phoneNumber String?
-  email       String  @unique
-
-  enableTextMessages         Boolean @default(true)
-  sendEmails                 Boolean @default(true)
-  enableRealTimeNotification Boolean @default(true)
-
-  totalSpent Decimal @default(0) @db.Decimal(10, 2)
+  companyName    String?
+  companyAddress String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orders   Order[]   @relation(name: "CustomerOrders")
-  payments Payment[]
-
-  user User   @relation(fields: [email], references: [email])
-  chat Chat[]
-
-  @@map("customers")
+  @@map("partners")
 }
 
-enum CheckType {
-  individual
-  business
+model Student {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  email String @unique
+  user  User   @relation(fields: [email], references: [email])
+
+  discordUsername String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("students")
 }
 
-// ** Admin Model **
 model Admin {
-  id          Int     @id @default(autoincrement())
-  adminId     String  @unique
-  firstName   String
-  lastName    String?
-  phoneNumber String
-  email       String  @unique
-  user        User    @relation(fields: [email], references: [email])
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  email String @unique
+  user  User   @relation(fields: [email], references: [email])
+
+  adminId String @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("admins")
-}
-
-// user status enum
-enum UserStatus {
-  ACTIVE
-  BLOCKED
-}
-
-// user role enum
-enum UserRole {
-  SUPER_ADMIN
-  ADMIN
-  HELPER
-  CUSTOMER
-}
-
-// ** Contact Us Model **
-model ContactUs {
-  id          Int      @id @default(autoincrement())
-  name        String
-  email       String
-  phoneNumber String
-  subject     String
-  message     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@map("contact_us")
-}
-
-// ** Order Model **
-model Order {
-  id      Int    @id @default(autoincrement())
-  orderId String @unique
-
-  subject         String
-  description     String
-  duration        String
-  timeUnit        TimeUnit
-  serviceLocation String
-  city            String
-  state           String
-  serviceType     String
-  otherService    String? // Optional field in case 'Other' is selected
-  serviceOption   ServiceOption
-  isPublished     Boolean       @default(true)
-  budget          Budget[]
-  totalCost       Decimal       @default(0) @db.Decimal(10, 2)
-
-  status OrderStatus @default(OPEN)
-
-  freeVisits FreeVisit[]
-
-  paymentStatus PaymentStatus @default(PAYMENT_PENDING) // To track payment status
-  paymentMethod PaymentMethod @default(STRIPE) // Payment method
-
-  customerId Int
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade, name: "CustomerOrders")
-
-  helperId Int?
-  helper   Helper? @relation(fields: [helperId], references: [id], name: "HelperOrders")
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  payment   Payment[]
-  chat      Chat?
-
-  @@map("orders")
-}
-
-// ** Budget Model **
-model Budget {
-  id                   Int     @id @default(autoincrement())
-  stepCost             Decimal @db.Decimal(10, 2)
-  stepDescription      String
-  helperConfirmation   Boolean @default(false)
-  customerConfirmation Boolean @default(false)
-
-  orderId Int
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("budgets")
-}
-
-// ** Free Visit Model **
-model FreeVisit {
-  id Int @id @default(autoincrement())
-
-  orderId Int
-  order   Order  @relation(fields: [orderId], references: [id])
-
-  helperId String
-  helper   Helper @relation(fields: [helperId], references: [helperId])
-
-  scheduledDate    DateTime? // Scheduled date and time for the service
-  shceduledTime    String?
-  shortMessage     String?
-  rejectionMessage String?
-  freeVisitStatus  FreeVisitStatus @default(NOT_OFFERED)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("free_visits")
-}
-
-enum FreeVisitStatus {
-  OFFERED // Helper has offered a free visit
-  ACCEPTED // Customer has accepted the free visit
-  REJECTED // Customer has rejected the free visit
-  NOT_OFFERED // No free visit is being offered (default)
-}
-
-// Order status enum
-enum OrderStatus {
-  OPEN // Order created, waiting for helper
-  IN_PROGRESS // Helper has started working on the order
-  COMPLETED // Service completed
-  CANCELLED // Order cancelled by customer or helper
-}
-
-enum PaymentMethod {
-  CREDIT_CARD
-  STRIPE
-  PAYPAL
-}
-
-// Payment status enum
-enum PaymentStatus {
-  PAYMENT_PENDING
-  PAYMENT_IN_PROGRESS
-  PAYMENT_RECEIVED
-  REFUND_IN_PROGRESS
-}
-
-enum ServiceOption {
-  MATERIAL_INCLUDED
-  ONLY_LABOR
-}
-
-enum TimeUnit {
-  hours
-  days
-  weeks
-  months
-  years
-}
-
-// ** Payment Model **
-model Payment {
-  id            Int           @id @default(autoincrement())
-  paymentMethod PaymentMethod @default(STRIPE)
-  paymentStatus PaymentStatus @default(PAYMENT_PENDING)
-  amount        Decimal       @default(0) @db.Decimal(10, 2)
-  transactionId String? // Stripe Transaction ID
-
-  orderId Int
-  order   Order @relation(fields: [orderId], references: [id])
-
-  customerId Int // Linking Payment to Customer
-  customer   Customer @relation(fields: [customerId], references: [id]) // Establishing relation
-
-  helperId Int?
-  helper   Helper? @relation(fields: [helperId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("payments")
-}
-
-// ** Bank Account Model **
-model BankAccount {
-  id            Int         @id @default(autoincrement())
-  routingNumber String
-  accountNumber String      @unique
-  accountType   AccountType
-
-  userEmail String
-  user      User   @relation(fields: [userEmail], references: [email])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("bank_accounts")
-}
-
-enum AccountType {
-  CHECKING
-  SAVINGS
-}
-
-// ** Debit & Credit Card Model **
-model Card {
-  id             Int    @id @default(autoincrement())
-  cardHolderName String
-  cardNumber     String @unique
-  expiryMonth    String
-  expiryYear     String
-  cvv            String
-  zipCode        String
-  billingAddress String
-
-  userEmail String
-  user      User   @relation(fields: [userEmail], references: [email])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("cards")
-}
-
-model Chat {
-  id      Int   @id @default(autoincrement())
-  orderId Int   @unique
-  order   Order @relation(fields: [orderId], references: [id])
-
-  customerId Int
-  customer   Customer @relation(fields: [customerId], references: [id])
-
-  helperId Int
-  helper   Helper @relation(fields: [helperId], references: [id])
-
-  messages  Message[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@map("chats")
-}
-
-model Message {
-  id         Int      @id @default(autoincrement())
-  chatId     Int
-  chat       Chat     @relation(fields: [chatId], references: [id])
-  senderId   Int
-  senderRole UserRole
-  content    String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@map("messages")
 }

@@ -1,19 +1,18 @@
+import { UserRole } from "@prisma/client";
 import bcrypt from "bcrypt";
 import prisma from "../../shared/prisma";
-import { IAdmin } from "../modules/Admin/admin.interface";
 
 export const initiateSuperAdmin = async () => {
-  const payload: IAdmin = {
+  const payload = {
     firstName: "Super",
     lastName: "Admin",
     phoneNumber: "1234567890",
-    email: "khalid.hasan9753@gmail.com",
+    email: "superadmin@gmail10p.com",
     password: "123456",
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    role: UserRole.SUPER_ADMIN,
   };
 
-  const existingSuperAdmin = await prisma.admin.findUnique({
+  const existingSuperAdmin = await prisma.user.findUnique({
     where: { email: payload.email },
   });
 
@@ -31,19 +30,18 @@ export const initiateSuperAdmin = async () => {
 
     await TransactionClient.user.create({
       data: {
+        firstName: payload.firstName,
+        lastName: payload?.lastName,
+        phoneNumber: payload.phoneNumber,
         email: payload.email,
         password: hashedPassword,
-        role: "SUPER_ADMIN",
-        userStatus: "ACTIVE",
+        role: payload.role,
       },
     });
 
     await TransactionClient.admin.create({
       data: {
         adminId: adminId,
-        firstName: payload.firstName,
-        lastName: payload.lastName,
-        phoneNumber: payload.phoneNumber,
         email: payload.email,
       },
     });

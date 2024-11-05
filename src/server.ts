@@ -1,30 +1,34 @@
 import { Server } from "http";
 import app from "./app";
 import config from "./config";
-import { socketIo } from "./helpars/socketIo";
+
+let server: Server;
 
 // Main function to start the server
 function main() {
-  const server: Server = app.listen(config.port, () => {
-    console.log("Server is running on port", config.port);
-  });
-
-  socketIo(server);  // clear this if you don't need socket.io
-
-  // Graceful shutdown function
-  const exitHandler = () => {
-    if (server) {
-      server.close(() => {
-        console.log("Server closed");
-      });
-    }
-    process.exit(1);
-  };
-
-  // Handle uncaught exceptions and unhandled promise rejections
-  process.on("uncaughtException", exitHandler);
-  process.on("unhandledRejection", exitHandler);
+  try {
+    server = app.listen(config.port, () => {
+      console.log("Server is running on port", config.port);
+    });
+  } catch (error) {
+    console.log(error);
+  }
 }
 
 // Start the server
 main();
+
+process.on("unhandledRejection", (err) => {
+  console.log(`😈 unahandledRejection is detected , shutting down ...`, err);
+  if (server) {
+    server.close(() => {
+      process.exit(1);
+    });
+  }
+  process.exit(1);
+});
+
+process.on("uncaughtException", () => {
+  console.log(`😈 uncaughtException is detected , shutting down ...`);
+  process.exit(1);
+});
