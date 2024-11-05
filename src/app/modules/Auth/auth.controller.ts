@@ -107,18 +107,6 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const socialLogin = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthServices.socialLogin(req.body);
-  res.cookie("token", result.accessToken, { httpOnly: true });
-
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "User logged in successfully",
-    data: result,
-  });
-});
-
 export const AuthController = {
   loginUser,
   enterOtp,
@@ -127,5 +115,4 @@ export const AuthController = {
   changePassword,
   forgotPassword,
   resetPassword,
-  socialLogin,
 };

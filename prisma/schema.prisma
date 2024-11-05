@@ -30,14 +30,18 @@ enum UserStatus {
 // ---------------------------------------------------------
 
 model User {
-  id          String     @id @default(auto()) @map("_id") @db.ObjectId
-  firstName   String
-  lastName    String?
-  phoneNumber String?
-  email       String     @unique
-  password    String
-  role        UserRole   @default(STUDENT)
-  status      UserStatus @default(ACTIVE)
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  firstName    String
+  lastName     String?
+  phoneNumber  String?
+  email        String     @unique
+  password     String
+  role         UserRole   @default(STUDENT)
+  status       UserStatus @default(ACTIVE)
+  profileImage String?
+
+  otp       String?
+  otpExpiry DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -80,7 +84,8 @@ model Partner {
 }
 
 model Student {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  studentId String @unique
 
   email String @unique
   user  User   @relation(fields: [email], references: [email])

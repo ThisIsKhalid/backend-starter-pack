@@ -1,4 +1,4 @@
-import { UserStatus } from "@prisma/client";
+import { UserRole, UserStatus } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
 import httpStatus from "http-status";
@@ -8,7 +8,6 @@ import ApiError from "../../../errors/ApiErrors";
 import emailSender from "../../../helpars/emailSender";
 import { jwtHelpers } from "../../../helpars/jwtHelpers";
 import prisma from "../../../shared/prisma";
-import { ISocialUser } from "../User/user.interface";
 
 const loginUser = async (payload: { email: string; password: string }) => {
   const userData = await prisma.user.findUniqueOrThrow({
@@ -21,8 +20,8 @@ const loginUser = async (payload: { email: string; password: string }) => {
     throw new Error("User not found");
   }
 
-  if (userData.userStatus === UserStatus.BLOCKED) {
-    throw new Error("Your account is blocked.");
+  if (userData.status === UserStatus.INACTIVE) {
+    throw new Error("Your account is inactive");
   }
 
   if (!payload.password || !userData?.password) {
@@ -40,7 +39,6 @@ const loginUser = async (payload: { email: string; password: string }) => {
 
   const randomOtp = Math.floor(1000 + Math.random() * 9000).toString();
   const otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
-  const identifier = crypto.randomBytes(16).toString("hex");
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -80,11 +78,9 @@ const loginUser = async (payload: { email: string; password: string }) => {
     data: {
       otp: randomOtp,
       otpExpiry: otpExpiry,
-      identifier: identifier,
     },
   });
 
-  return identifier;
 };
 
 // user login
@@ -94,9 +90,6 @@ const enterOtp = async (payload: { otp: string; identifier: string }) => {
       AND: [
         {
           otp: payload.otp,
-        },
-        {
-          identifier: payload.identifier,
         },
       ],
     },
@@ -120,6 +113,16 @@ const enterOtp = async (payload: { otp: string; identifier: string }) => {
     config.jwt.expires_in as string
   );
 
+  const refreshToken = jwtHelpers.generateToken(
+    {
+      id: userData.id,
+      email: userData.email,
+      role: userData.role,
+    },
+    config.jwt.refresh_token_secret as Secret,
+    config.jwt.refresh_token_expires_in as string
+  );
+
   await prisma.user.update({
     where: {
       id: userData.id,
@@ -127,12 +130,12 @@ const enterOtp = async (payload: { otp: string; identifier: string }) => {
     data: {
       otp: null,
       otpExpiry: null,
-      identifier: null,
     },
   });
 
   const result = {
     accessToken,
+    refreshToken,
   };
 
   return result;
@@ -154,7 +157,7 @@ const getMyProfile = async (userToken: string) => {
         id: true,
         email: true,
         role: true,
-        userStatus: true,
+        status: true,
         profileImage: true,
         createdAt: true,
         updatedAt: true,
@@ -165,57 +168,31 @@ const getMyProfile = async (userToken: string) => {
       throw new ApiError(404, "User not found");
     }
 
-    if (userProfile.userStatus === UserStatus.BLOCKED) {
-      throw new ApiError(403, "Your account is blocked");
+    if (userProfile.status === UserStatus.INACTIVE) {
+      throw new ApiError(403, "Your account is inactive");
     }
 
-    if (userProfile.role === "CUSTOMER") {
-      const customerProfile = await TransactionClient.customer.findUnique({
+    if (userProfile.role === UserRole.STUDENT) {
+      const customerProfile = await TransactionClient.student.findUnique({
         where: {
           email: userProfile.email,
-        },
-        select: {
-          id: true,
-          customerId: true,
-          firstName: true,
-          lastName: true,
-          phoneNumber: true,
-          createdAt: true,
-          updatedAt: true,
         },
       });
 
       return { ...userProfile, ...customerProfile };
-    } else if (userProfile.role === "HELPER") {
-      const helperProfile = await TransactionClient.helper.findUnique({
+    } else if (userProfile.role === UserRole.BROKER) {
+      const helperProfile = await TransactionClient.broker.findUnique({
         where: {
           email: userProfile.email,
         },
-        select: {
-          id: true,
-          helperId: true,
-          firstName: true,
-          lastName: true,
-          phoneNumber: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+        
       });
 
       return { ...userProfile, ...helperProfile };
-    } else if (userProfile.role === "ADMIN") {
+    } else if (userProfile.role === UserRole.ADMIN) {
       const adminProfile = await TransactionClient.admin.findUnique({
         where: {
           email: userProfile.email,
-        },
-        select: {
-          id: true,
-          adminId: true,
-          firstName: true,
-          lastName: true,
-          phoneNumber: true,
-          createdAt: true,
-          updatedAt: true,
         },
       });
 
@@ -333,11 +310,11 @@ const forgotPassword = async (payload: { email: string }) => {
 // reset password
 const resetPassword = async (
   token: string,
-  payload: { id: number; password: string }
+  payload: { email: string; password: string }
 ) => {
-  const userData = await prisma.user.findUniqueOrThrow({
+  const userData = await prisma.user.findUnique({
     where: {
-      id: payload.id,
+    email: payload.email,
     },
   });
 
@@ -360,95 +337,13 @@ const resetPassword = async (
   // update into database
   await prisma.user.update({
     where: {
-      id: payload.id,
+      email : payload.email,
     },
     data: {
       password,
     },
   });
   return { message: "Password reset successfully" };
-};
-
-// -----------------------------------------------------------------
-// SOCIAL LOGIN
-// -----------------------------------------------------------------
-
-const socialLogin = async (payload: ISocialUser) => {
-  const user = await prisma.user.findUnique({
-    where: {
-      email: payload.email,
-    },
-  });
-
-  if (user?.userStatus === UserStatus.BLOCKED) {
-    throw new ApiError(403, "Your account is blocked");
-  }
-
-  if (user?.isDeleted) {
-    throw new ApiError(404, "User not found");
-  }
-
-  const result = await prisma.$transaction(async (TransactionClient) => {
-    const customerId =
-      "#" +
-      payload?.firstName?.slice(0, 2) +
-      payload?.lastName?.slice(0, 2) +
-      Math.floor(Math.random() * 1000000);
-    // user exists
-
-    if (user) {
-      const accessToken = jwtHelpers.generateToken(
-        {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-        },
-        config.jwt.jwt_secret as Secret,
-        config.jwt.expires_in as string
-      );
-
-      return { accessToken };
-    } else {
-      // user does not exist, create account in user & customer table
-      await TransactionClient.user.create({
-        data: {
-          email: payload.email,
-          role: "CUSTOMER",
-          userStatus: "ACTIVE",
-          profileImage: payload.profileImage,
-        },
-      });
-
-      await TransactionClient.customer.create({
-        data: {
-          customerId: customerId,
-          firstName: payload.firstName,
-          lastName: payload.lastName,
-          email: payload.email,
-        },
-      });
-
-      const newUser = await TransactionClient.user.findUnique({
-        where: {
-          email: payload.email,
-        },
-      });
-
-      const accessToken = jwtHelpers.generateToken(
-        {
-          id: newUser?.id,
-          email: newUser?.email,
-          role: newUser?.role,
-        },
-        config.jwt.jwt_secret as Secret,
-        config.jwt.expires_in as string
-      );
-
-      return { accessToken };
-    }
-  });
-
-  return result;
 };
 
 export const AuthServices = {
@@ -458,5 +353,4 @@ export const AuthServices = {
   changePassword,
   forgotPassword,
   resetPassword,
-  socialLogin,
 };
