@@ -3,10 +3,13 @@ import { NextFunction, Request, Response } from "express";
 import { Secret } from "jsonwebtoken";
 import config from "../../config";
 
+import { UserStatus } from "@prisma/client";
 import httpStatus from "http-status";
 import ApiError from "../../errors/ApiErrors";
 import { jwtHelpers } from "../../helpars/jwtHelpers";
 import prisma from "../../shared/prisma";
+
+//  auth(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 
 const auth = (...roles: string[]) => {
   return async (
@@ -36,10 +39,10 @@ const auth = (...roles: string[]) => {
         throw new ApiError(httpStatus.NOT_FOUND, "This user is not found !");
       }
 
-      const userStatus = user?.userStatus;
+      const userStatus = user?.status;
 
-      if (userStatus === "BLOCKED") {
-        throw new ApiError(httpStatus.FORBIDDEN, "This user is blocked ! !");
+      if (userStatus === UserStatus.INACTIVE) {
+        throw new ApiError(httpStatus.FORBIDDEN, "This user is inactive !");
       }
 
       if (roles.length && !roles.includes(verifiedUser.role)) {

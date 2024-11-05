@@ -20,14 +20,10 @@ const uploadSingle = upload.single("carImage");
 const uploadMultiple = upload.fields([
   { name: "singleImage", maxCount: 10 },
   { name: "galleryImage", maxCount: 10 },
- 
- 
 ]);
 
 
 
 export const fileUploader = {
   upload,
-  uploadSingle,
-  uploadMultiple,
 };
