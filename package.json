@@ -1,5 +1,5 @@
 {
-  "name": "starter-pack",
+  "name": "backend-starter",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
@@ -7,14 +7,14 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "prisma generate"
+    "postinstall": "npx prisma generate"
   },
   "keywords": [],
   "author": "khalid",
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "@types/bcrypt": "^5.0.2",
+    "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.7",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
@@ -23,17 +23,20 @@
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^6.4.15",
     "@types/uuid": "^10.0.0",
-    "prisma": "^5.21.1",
+    "prisma": "^6.1.0",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.5.3"
   },
   "dependencies": {
-    "@prisma/client": "^5.21.1",
+    "@aws-sdk/client-s3": "^3.717.0",
+    "@paypal/paypal-server-sdk": "^0.6.1",
+    "@prisma/client": "^6.1.0",
+    "@sendgrid/mail": "^8.1.4",
     "@types/jsonwebtoken": "^9.0.6",
-    "bcrypt": "^5.1.1",
+    "axios": "^1.7.7",
+    "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.3",
-    "cloudinary": "^2.3.1",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

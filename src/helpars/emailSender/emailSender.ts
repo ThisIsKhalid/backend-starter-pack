@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
-import config from "../config";
-import ApiError from "../errors/ApiErrors";
+import config from "../../config";
+import ApiError from "../../errors/ApiErrors";
 
 const emailSender = async (subject: string, email: string, html: string) => {
   const transporter = nodemailer.createTransport({
@@ -14,7 +14,7 @@ const emailSender = async (subject: string, email: string, html: string) => {
   const emailTransport = transporter;
 
   const mailOptions = {
-    from: `"How's" <${config.emailSender.email}>`,
+    from: `"My Financial Trading" <${config.emailSender.email}>`,
     to: email,
     subject,
     html,
@@ -23,7 +23,7 @@ const emailSender = async (subject: string, email: string, html: string) => {
   // Send the email
   try {
     const info = await emailTransport.sendMail(mailOptions);
-    // console.log("Email sent: " + info.response);
+    console.log("Email sent: " + info.response);
   } catch (error) {
     console.error("Error sending email:", error);
     throw new ApiError(500, "Error sending email");

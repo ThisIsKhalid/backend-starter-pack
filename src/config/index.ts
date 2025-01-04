@@ -23,18 +23,13 @@ export default {
     email: process.env.EMAIL,
     app_pass: process.env.APP_PASS,
   },
-  ssl: {
-    storeId: process.env.STORE_ID,
-    storePass: process.env.STORE_PASS,
-    successUrl: process.env.SUCCESS_URL,
-    cancelUrl: process.env.CANCEL_URL,
-    failUrl: process.env.FAIL_URL,
-    sslPaymentApi: process.env.SSL_PAYMENT_API,
-    sslValidationApi: process.env.SSL_VALIDATIOIN_API,
+  paypal: {
+    client_id: process.env.PAYPEL_CLIENT_ID,
+    client_secret: process.env.PAYPAL_CLIENT_SECRET,
+    mode: process.env.PAYPAL_MODE,
   },
-  cloudinary: {
-    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
-    apiKey: process.env.CLOUDINARY_API_KEY,
-    apiSecret: process.env.CLOUDINARY_API_SECRET,
+  sendGrid: {
+    api_key: process.env.SENDGRID_API_KEY,
+    email_from: process.env.SENDGRID_EMAIL,
   },
 };
