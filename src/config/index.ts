@@ -32,4 +32,10 @@ export default {
     api_key: process.env.SENDGRID_API_KEY,
     email_from: process.env.SENDGRID_EMAIL,
   },
+  aws: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_REGION,
+    bucketName: process.env.AWS_BUCKET_NAME,
+  },
 };

@@ -1,5 +1,5 @@
 import { UserRole } from "@prisma/client";
-import * as bcrypt from "bcrypt";
+import * as bcrypt from "bcryptjs";
 import httpStatus from "http-status";
 import { v4 as uuidv4 } from "uuid";
 import ApiError from "../../../errors/ApiErrors";
