@@ -38,4 +38,7 @@ export default {
     region: process.env.AWS_REGION,
     bucketName: process.env.AWS_BUCKET_NAME,
   },
+  password: {
+    password_salt: process.env.PASSWORD_SALT
+  },
 };

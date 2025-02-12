@@ -6,8 +6,8 @@ import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
 import { AuthServices } from "./auth.service";
 
-const loginUser = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthServices.loginUser(req.body);
+const loginUserWithEmail = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthServices.loginUserWithEmail(req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -20,13 +20,30 @@ const enterOtp = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthServices.enterOtp(req.body);
 
   // res.cookie("token", result.accessToken, { httpOnly: true });
-  res.cookie("token", result.accessToken, {
-    secure: config.env === "production",
-    httpOnly: true,
-    sameSite: "none",
-    maxAge: 1000 * 60 * 60 * 24 * 365,
-  });
+  // res.cookie("token", result.accessToken, {
+  //   secure: config.env === "production",
+  //   httpOnly: true,
+  //   sameSite: "none",
+  //   maxAge: 1000 * 60 * 60 * 24 * 365,
+  // });
 
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User logged in successfully",
+    data: result,
+  });
+});
+
+const loginWithGoogle = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthServices.loginWithGoogle(req.body);
+
+  // res.cookie("token", result.accessToken, {
+  //   secure: config.env === "production",
+  //   httpOnly: true,
+  //   sameSite: "none",
+  //   maxAge: 1000 * 60 * 60 * 24 * 30
+  // });
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -108,7 +125,8 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const AuthController = {
-  loginUser,
+  loginUserWithEmail,
+  loginWithGoogle,
   enterOtp,
   logoutUser,
   getMyProfile,
