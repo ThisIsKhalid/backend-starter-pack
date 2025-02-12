@@ -1,46 +1,47 @@
-import { UserRole, UserStatus } from "@prisma/client";
+import {Provider, UserRole, UserStatus} from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
 import httpStatus from "http-status";
-import { Secret } from "jsonwebtoken";
+import {Secret} from "jsonwebtoken";
 import config from "../../../config";
 import ApiError from "../../../errors/ApiErrors";
-import { jwtHelpers } from "../../../helpars/jwtHelpers";
+import {jwtHelpers} from "../../../helpars/jwtHelpers";
 import prisma from "../../../shared/prisma";
 import emailSender from "../../../helpars/emailSender/emailSender";
+import {comparePassword} from "../../../helpars/passwordHelpers";
 
-const loginUser = async (payload: { email: string; password: string }) => {
-  const userData = await prisma.user.findUniqueOrThrow({
-    where: {
-      email: payload.email,
-    },
-  });
+const loginUserWithEmail = async (payload: { email: string; password: string }) => {
+    const userData = await prisma.user.findUniqueOrThrow({
+        where: {
+            email: payload.email,
+        },
+    });
+    if (!userData) {
+        throw new ApiError(400, "User not found");
+    }
 
-  if (!userData) {
-    throw new Error("User not found");
-  }
+    if (userData.provider !== Provider.EMAIL) {
+        throw new ApiError(400, "Please login with your Google account");
+    }
+    if (userData.status === UserStatus.INACTIVE) {
+        throw new ApiError(400, "Your account is INACTIVE");
+    }
 
-  if (userData.status === UserStatus.INACTIVE) {
-    throw new Error("Your account is inactive");
-  }
+    if (!payload.password || !userData?.password) {
+        throw new Error("Password is required");
+    }
 
-  if (!payload.password || !userData?.password) {
-    throw new Error("Password is required");
-  }
 
-  const isCorrectPassword: boolean = await bcrypt.compare(
-    payload.password,
-    userData.password
-  );
+    const isCorrectPassword = await comparePassword(payload.password, userData.password);
 
-  if (!isCorrectPassword) {
-    throw new Error("Password incorrect!");
-  }
+    if (!isCorrectPassword) {
+        throw new ApiError(400, "Password incorrect!");
+    }
 
-  const randomOtp = Math.floor(1000 + Math.random() * 9000).toString();
-  const otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
+    const randomOtp = Math.floor(1000 + Math.random() * 9000).toString();
+    const otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
 
-  const html = `<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -69,204 +70,299 @@ const loginUser = async (payload: { email: string; password: string }) => {
 </body>
 </html>`;
 
-  await emailSender("OTP", userData.email, html);
+    await emailSender("OTP", userData.email, html);
 
-  await prisma.user.update({
-    where: {
-      id: userData.id,
-    },
-    data: {
-      otp: randomOtp,
-      otpExpiry: otpExpiry,
-    },
-  });
+    await prisma.user.update({
+        where: {
+            id: userData.id,
+        },
+        data: {
+            otp: randomOtp,
+            otpExpiry: otpExpiry,
+        },
+    });
 
 };
 
 // user login
-const enterOtp = async (payload: { otp: string; identifier: string }) => {
-  const userData = await prisma.user.findFirst({
-    where: {
-      AND: [
-        {
-          otp: payload.otp,
+const enterOtp = async (payload: { otp: string; email: string; keepMeLogin?: boolean }) => {
+
+    const userData = await prisma.user.findFirst({
+        where: {
+            email: payload.email,
+            otp: payload.otp,
         },
-      ],
-    },
-  });
+    });
 
-  if (!userData) {
-    throw new ApiError(404, "Your otp is incorrect");
-  }
+    if (!userData) {
+        throw new ApiError(404, "Your otp is incorrect");
+    }
 
-  if (userData.otpExpiry && userData.otpExpiry < new Date()) {
-    throw new ApiError(400, "Your otp has been expired");
-  }
+    if (userData.otpExpiry && userData.otpExpiry < new Date()) {
+        throw new ApiError(400, "Your otp has been expired");
+    }
 
-  const accessToken = jwtHelpers.generateToken(
-    {
-      id: userData.id,
-      email: userData.email,
-      role: userData.role,
-    },
-    config.jwt.jwt_secret as Secret,
-    config.jwt.expires_in as string
-  );
+    let accessToken;
+    let refreshToken;
 
-  const refreshToken = jwtHelpers.generateToken(
-    {
-      id: userData.id,
-      email: userData.email,
-      role: userData.role,
-    },
-    config.jwt.refresh_token_secret as Secret,
-    config.jwt.refresh_token_expires_in as string
-  );
+    if (payload.keepMeLogin) {
+        accessToken = jwtHelpers.generateToken(
+            {
+                id: userData.id,
+                email: userData.email,
+                role: userData.role,
+            },
+            config.jwt.jwt_secret as Secret,
+            payload.keepMeLogin as boolean
+        );
 
-  await prisma.user.update({
-    where: {
-      id: userData.id,
-    },
-    data: {
-      otp: null,
-      otpExpiry: null,
-    },
-  });
 
-  const result = {
-    accessToken,
-    refreshToken,
-  };
+        refreshToken = jwtHelpers.generateToken(
+            {
+                id: userData.id,
+                email: userData.email,
+                role: userData.role,
+            },
+            config.jwt.refresh_token_secret as Secret,
+            payload.keepMeLogin as boolean
+        );
+    } else {
+        accessToken = jwtHelpers.generateToken(
+            {
+                id: userData.id,
+                email: userData.email,
+                role: userData.role,
+            },
+            config.jwt.jwt_secret as Secret,
+            config.jwt.expires_in as string
+        );
 
-  return result;
+        refreshToken = jwtHelpers.generateToken(
+            {
+                id: userData.id,
+                email: userData.email,
+                role: userData.role,
+            },
+            config.jwt.refresh_token_secret as Secret,
+            config.jwt.refresh_token_expires_in as string
+        );
+    }
+
+
+    await prisma.user.update({
+        where: {
+            id: userData.id,
+        },
+        data: {
+            otp: null,
+            otpExpiry: null,
+            refreshToken
+        },
+    });
+
+    const result = {
+        accessToken,
+        refreshToken,
+    };
+
+    return result;
 };
+
+
+const loginWithGoogle = async (payload: {
+    firstName: string,
+    lastName?: string,
+    email: string,
+    profileImage: string
+}) => {
+    const userData = await prisma.user.findUnique({
+        where: {
+            email: payload.email,
+        },
+    });
+
+    if (!userData) {
+        await prisma.user.create({
+            data: {
+                firstName: payload.firstName,
+                lastName: payload.lastName || null,
+                email: payload.email,
+                profileImage: payload?.profileImage,
+                provider: Provider.GOOGLE
+            }
+        })
+        return {message: "User created successfully", accessToken: null};
+    }
+
+    if (userData.provider !== Provider.GOOGLE) {
+        throw new ApiError(400, "Please login with your email and password");
+    }
+
+    if (userData.status === UserStatus.INACTIVE) {
+        throw new ApiError(403, "Your account is Suspended");
+    }
+
+    const accessToken = jwtHelpers.generateToken(
+        {
+            id: userData.id,
+            email: userData.email,
+            role: userData.role,
+        },
+        config.jwt.jwt_secret as Secret,
+        config.jwt.expires_in as string
+    );
+
+    const refreshToken = jwtHelpers.generateToken(
+        {
+            id: userData.id,
+            email: userData.email,
+            role: userData.role,
+        },
+        config.jwt.refresh_token_secret as Secret,
+        config.jwt.expires_in as string
+    );
+
+    await prisma.user.update({
+        where: {
+            id: userData.id,
+        },
+        data: {
+            refreshToken,
+        },
+    });
+
+    return {
+        accessToken,
+        refreshToken,
+    };
+}
 
 // get user profile
 const getMyProfile = async (userToken: string) => {
-  const decodedToken = jwtHelpers.verifyToken(
-    userToken,
-    config.jwt.jwt_secret!
-  );
+    const decodedToken = jwtHelpers.verifyToken(
+        userToken,
+        config.jwt.jwt_secret!
+    );
 
-  const result = await prisma.$transaction(async (TransactionClient) => {
-    const userProfile = await TransactionClient.user.findUnique({
-      where: {
-        id: decodedToken?.id,
-      },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        status: true,
-        profileImage: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    const result = await prisma.$transaction(async (TransactionClient) => {
+        const userProfile = await TransactionClient.user.findUnique({
+            where: {
+                id: decodedToken?.id,
+            },
+            select: {
+                id: true,
+                email: true,
+                role: true,
+                status: true,
+                profileImage: true,
+                createdAt: true,
+                updatedAt: true,
+            },
+        });
+
+        if (!userProfile) {
+            throw new ApiError(404, "User not found");
+        }
+
+        if (userProfile.status === UserStatus.INACTIVE) {
+            throw new ApiError(403, "Your account is inactive");
+        }
+
+        if (userProfile.role === UserRole.STUDENT) {
+            const customerProfile = await TransactionClient.student.findUnique({
+                where: {
+                    email: userProfile.email,
+                },
+            });
+
+            return {...userProfile, ...customerProfile};
+        } else if (userProfile.role === UserRole.BROKER) {
+            const helperProfile = await TransactionClient.broker.findUnique({
+                where: {
+                    email: userProfile.email,
+                },
+
+            });
+
+            return {...userProfile, ...helperProfile};
+        } else if (userProfile.role === UserRole.ADMIN) {
+            const adminProfile = await TransactionClient.admin.findUnique({
+                where: {
+                    email: userProfile.email,
+                },
+            });
+
+            return {...userProfile, ...adminProfile};
+        }
+
+        return userProfile;
     });
 
-    if (!userProfile) {
-      throw new ApiError(404, "User not found");
-    }
-
-    if (userProfile.status === UserStatus.INACTIVE) {
-      throw new ApiError(403, "Your account is inactive");
-    }
-
-    if (userProfile.role === UserRole.STUDENT) {
-      const customerProfile = await TransactionClient.student.findUnique({
-        where: {
-          email: userProfile.email,
-        },
-      });
-
-      return { ...userProfile, ...customerProfile };
-    } else if (userProfile.role === UserRole.BROKER) {
-      const helperProfile = await TransactionClient.broker.findUnique({
-        where: {
-          email: userProfile.email,
-        },
-        
-      });
-
-      return { ...userProfile, ...helperProfile };
-    } else if (userProfile.role === UserRole.ADMIN) {
-      const adminProfile = await TransactionClient.admin.findUnique({
-        where: {
-          email: userProfile.email,
-        },
-      });
-
-      return { ...userProfile, ...adminProfile };
-    }
-
-    return userProfile;
-  });
-
-  return result;
+    return result;
 };
 
 // change password
 
 const changePassword = async (
-  userToken: string,
-  newPassword: string,
-  oldPassword: string
+    userToken: string,
+    newPassword: string,
+    oldPassword: string
 ) => {
-  const decodedToken = jwtHelpers.verifyToken(
-    userToken,
-    config.jwt.jwt_secret!
-  );
+    const decodedToken = jwtHelpers.verifyToken(
+        userToken,
+        config.jwt.jwt_secret!
+    );
 
-  const user = await prisma.user.findUnique({
-    where: { id: decodedToken?.id },
-  });
+    const user = await prisma.user.findUnique({
+        where: {id: decodedToken?.id},
+    });
 
-  if (!user || !user?.password) {
-    throw new ApiError(404, "User not found");
-  }
+    if (!user || !user?.password) {
+        throw new ApiError(404, "User not found");
+    }
 
-  const isPasswordValid = await bcrypt.compare(oldPassword, user?.password);
+    const isPasswordValid = await bcrypt.compare(oldPassword, user?.password);
 
-  if (!isPasswordValid) {
-    throw new ApiError(401, "Incorrect old password");
-  }
+    if (!isPasswordValid) {
+        throw new ApiError(401, "Incorrect old password");
+    }
 
-  const hashedPassword = await bcrypt.hash(newPassword, 12);
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
 
-  await prisma.user.update({
-    where: {
-      id: decodedToken.id,
-    },
-    data: {
-      password: hashedPassword,
-    },
-  });
-  return { message: "Password changed successfully" };
+    await prisma.user.update({
+        where: {
+            id: decodedToken.id,
+        },
+        data: {
+            password: hashedPassword,
+        },
+    });
+    return {message: "Password changed successfully"};
 };
 
 const forgotPassword = async (payload: { email: string }) => {
-  const userData = await prisma.user.findUnique({
-    where: {
-      email: payload.email,
-    },
-  });
-  if (!userData) {
-    throw new ApiError(404, "User not found");
-  }
+    const userData = await prisma.user.findUnique({
+        where: {
+            email: payload.email,
+        },
+    });
+    if (!userData) {
+        throw new ApiError(404, "User not found");
+    }
 
-  const resetPassToken = jwtHelpers.generateToken(
-    { email: userData.email, role: userData.role },
-    config.jwt.reset_pass_secret as Secret,
-    config.jwt.reset_pass_token_expires_in as string
-  );
+    const resetPassToken = jwtHelpers.generateToken(
+        {email: userData.email, role: userData.role},
+        config.jwt.reset_pass_secret as Secret,
+        config.jwt.reset_pass_token_expires_in as string
+    );
 
-  const resetPassLink =
-    config.reset_pass_link + `?userId=${userData.id}&token=${resetPassToken}`;
+    const resetPassLink =
+        config.reset_pass_link + `?userId=${userData.id}&token=${resetPassToken}`;
 
-  await emailSender(
-    "Reset Your Password",
-    userData.email,
-    `<!DOCTYPE html>
+    await emailSender(
+        "Reset Your Password",
+        userData.email,
+        `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -300,57 +396,58 @@ const forgotPassword = async (payload: { email: string }) => {
     </div>
 </body>
 </html>`
-  );
-  return {
-    message: "Reset password link sent via your email successfully",
-    resetPassLink,
-  };
+    );
+    return {
+        message: "Reset password link sent via your email successfully",
+        resetPassLink,
+    };
 };
 
 // reset password
 const resetPassword = async (
-  token: string,
-  payload: { email: string; password: string }
+    token: string,
+    payload: { email: string; password: string }
 ) => {
-  const userData = await prisma.user.findUnique({
-    where: {
-    email: payload.email,
-    },
-  });
+    const userData = await prisma.user.findUnique({
+        where: {
+            email: payload.email,
+        },
+    });
 
-  if (!userData) {
-    throw new ApiError(404, "User not found");
-  }
+    if (!userData) {
+        throw new ApiError(404, "User not found");
+    }
 
-  const isValidToken = jwtHelpers.verifyToken(
-    token,
-    config.jwt.reset_pass_secret as Secret
-  );
+    const isValidToken = jwtHelpers.verifyToken(
+        token,
+        config.jwt.reset_pass_secret as Secret
+    );
 
-  if (!isValidToken) {
-    throw new ApiError(httpStatus.FORBIDDEN, "Forbidden!");
-  }
+    if (!isValidToken) {
+        throw new ApiError(httpStatus.FORBIDDEN, "Forbidden!");
+    }
 
-  // hash password
-  const password = await bcrypt.hash(payload.password, 12);
+    // hash password
+    const password = await bcrypt.hash(payload.password, 12);
 
-  // update into database
-  await prisma.user.update({
-    where: {
-      email : payload.email,
-    },
-    data: {
-      password,
-    },
-  });
-  return { message: "Password reset successfully" };
+    // update into database
+    await prisma.user.update({
+        where: {
+            email: payload.email,
+        },
+        data: {
+            password,
+        },
+    });
+    return {message: "Password reset successfully"};
 };
 
 export const AuthServices = {
-  loginUser,
-  enterOtp,
-  getMyProfile,
-  changePassword,
-  forgotPassword,
-  resetPassword,
+    loginUserWithEmail,
+    enterOtp,
+    loginWithGoogle,
+    getMyProfile,
+    changePassword,
+    forgotPassword,
+    resetPassword,
 };

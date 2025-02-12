@@ -8,7 +8,8 @@ import { authValidation } from "./auth.validation";
 const router = express.Router();
 
 // user login route
-router.post("/login", AuthController.loginUser);
+router.post("/login-with-email", AuthController.loginUserWithEmail);
+router.post("/login-with-google", AuthController.loginWithGoogle);
 
 router.post("/otp-enter", AuthController.enterOtp);
 

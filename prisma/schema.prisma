@@ -25,6 +25,11 @@ enum UserStatus {
   INACTIVE
 }
 
+enum Provider {
+  EMAIL
+  GOOGLE
+}
+
 // ---------------------------------------------------------
 //  MODEL
 // ---------------------------------------------------------
@@ -35,7 +40,8 @@ model User {
   lastName     String?
   phoneNumber  String?
   email        String     @unique
-  password     String
+  password     String?
+  provider     Provider   @default(EMAIL)
   role         UserRole   @default(STUDENT)
   status       UserStatus @default(ACTIVE)
   profileImage String?
@@ -43,12 +49,13 @@ model User {
   otp       String?
   otpExpiry DateTime?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  brokers   Broker?
-  partners  Partner?
-  students  Student?
-  admins    Admin?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  brokers      Broker?
+  partners     Partner?
+  students     Student?
+  admins       Admin?
+  refreshToken String?
 
   @@map("users")
 }
