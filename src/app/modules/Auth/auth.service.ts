@@ -182,7 +182,7 @@ const loginWithGoogle = async (payload: {
     });
 
     if (!userData) {
-        await prisma.user.create({
+        const newUser = await prisma.user.create({
             data: {
                 firstName: payload.firstName,
                 lastName: payload.lastName || null,
@@ -191,7 +191,28 @@ const loginWithGoogle = async (payload: {
                 provider: Provider.GOOGLE
             }
         })
-        return {message: "User created successfully", accessToken: null};
+
+        const accessToken = jwtHelpers.generateToken(
+            {
+                id: newUser.id,
+                email: newUser.email,
+                role:UserRole.NORMAL_USER
+            },
+            config.jwt.jwt_secret as Secret,
+            config.jwt.expires_in as string
+        );
+
+        const refreshToken = jwtHelpers.generateToken(
+            {
+                id: newUser.id,
+                email: newUser.email,
+                role:UserRole.NORMAL_USER
+            },
+            config.jwt.refresh_token_secret as Secret,
+            config.jwt.expires_in as string
+        );
+
+        return {message: "User created successfully", accessToken, refreshToken};
     }
 
     if (userData.provider !== Provider.GOOGLE) {
