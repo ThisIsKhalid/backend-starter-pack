@@ -1,14 +1,15 @@
 import { Prisma } from "@prisma/client";
 import { NextFunction, Request, Response } from "express";
 import httpStatus from "http-status";
+import { TokenExpiredError } from "jsonwebtoken";
 import { ZodError } from "zod";
+import config from "../../config";
 import ApiError from "../../errors/ApiErrors";
 import handleClientError from "../../errors/handleClientError";
 import handleValidationError from "../../errors/handleValidationError";
 import handleZodError from "../../errors/handleZodError";
 import parsePrismaValidationError from "../../errors/parsePrismaValidationError";
 import { IGenericErrorMessage } from "../../interfaces/error";
-import config from "../../config";
 
 const GlobalErrorHandler = (
   error: any,
@@ -56,8 +57,8 @@ const GlobalErrorHandler = (
           },
         ]
       : [];
-  } 
-  
+  }
+
   // Handle Errors
   else if (error instanceof Error) {
     message = error?.message;
@@ -135,6 +136,15 @@ const GlobalErrorHandler = (
       {
         path: "",
         message: "Reference Error",
+      },
+    ];
+  } else if (error instanceof TokenExpiredError) {
+    statusCode = 401;
+    message = "Your session has expired. Please log in again.";
+    errorMessages = [
+      {
+        path: "token",
+        message: `Token expired at ${error.expiredAt.toISOString()}`,
       },
     ];
   }

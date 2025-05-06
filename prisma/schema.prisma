@@ -1,6 +1,6 @@
 // datasource and generator setup
 datasource db {
-  provider = "mongodb"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -8,114 +8,30 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// ---------------------------------------------------------
-//  ENUMS
-// ---------------------------------------------------------
-
 enum UserRole {
-  STUDENT
-  BROKER
-  PARTNER
+  USER
   ADMIN
-  SUPER_ADMIN
-  NORMAL_USER
 }
-
-enum UserStatus {
-  ACTIVE
-  INACTIVE
-}
-
-enum Provider {
-  EMAIL
-  GOOGLE
-}
-
-// ---------------------------------------------------------
-//  MODEL
-// ---------------------------------------------------------
 
 model User {
-  id           String     @id @default(auto()) @map("_id") @db.ObjectId
-  firstName    String
-  lastName     String?
-  phoneNumber  String?
-  email        String     @unique
-  password     String?
-  provider     Provider   @default(EMAIL)
-  role         UserRole   @default(STUDENT)
-  status       UserStatus @default(ACTIVE)
-  profileImage String?
+  id String @id @default(cuid())
 
-  otp       String?
-  otpExpiry DateTime?
+  firstName String
+  lastName  String
+  email     String @unique
+  password  String
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  brokers      Broker?
-  partners     Partner?
-  students     Student?
-  admins       Admin?
+  role UserRole @default(USER)
+
+  otp          String?
+  otpExpiresAt DateTime?
+  isVerified   Boolean   @default(false)
+
+  accessToken  String?
   refreshToken String?
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@map("users")
-}
-
-model Broker {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
-
-  email String @unique
-  user  User   @relation(fields: [email], references: [email])
-
-  agency        String?
-  licenseNumber String?
-  webHostedUrl  String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("brokers")
-}
-
-model Partner {
-  id    String @id @default(auto()) @map("_id") @db.ObjectId
-  email String @unique
-  user  User   @relation(fields: [email], references: [email])
-
-  companyName    String?
-  companyAddress String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("partners")
-}
-
-model Student {
-  id        String @id @default(auto()) @map("_id") @db.ObjectId
-  studentId String @unique
-
-  email String @unique
-  user  User   @relation(fields: [email], references: [email])
-
-  discordUsername String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("students")
-}
-
-model Admin {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
-
-  email String @unique
-  user  User   @relation(fields: [email], references: [email])
-
-  adminId String @unique
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("admins")
 }
