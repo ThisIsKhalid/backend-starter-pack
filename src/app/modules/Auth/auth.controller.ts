@@ -98,9 +98,9 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
 });
 
 const logOutUser = catchAsync(async (req: Request, res: Response) => {
-  const user = req.user;
+  const email = req.body.email;
 
-  const result = await AuthServices.logOutUser(user?.email);
+  const result = await AuthServices.logOutUser(email);
 
   res.clearCookie("token", {
     secure: config.env === "production",
