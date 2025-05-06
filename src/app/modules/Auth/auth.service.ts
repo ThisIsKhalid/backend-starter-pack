@@ -111,7 +111,11 @@ const refreshToken = async (refreshToken: string) => {
   return { accessToken };
 };
 
-const loginUser = async (email: string, password: string) => {
+const loginUser = async (
+  email: string,
+  password: string,
+  keepMeLogin?: boolean
+) => {
   const userData = await prisma.user.findUniqueOrThrow({
     where: {
       email: email,
@@ -170,6 +174,16 @@ const loginUser = async (email: string, password: string) => {
       config.jwt.jwt_secret as Secret,
       config.jwt.expires_in as string
     );
+
+    // const accessToken = jwtHelpers.generateToken(
+    //   {
+    //     id: userData.id,
+    //     email: userData.email,
+    //     role: userData.role,
+    //   },
+    //   config.jwt.jwt_secret as Secret,
+    //   keepMeLogin as boolean,
+    // );
 
     const refreshToken = jwtHelpers.generateToken(
       {
