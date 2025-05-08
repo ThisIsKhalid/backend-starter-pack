@@ -1,6 +1,6 @@
 // datasource and generator setup
 datasource db {
-  provider = "mongodb"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -13,9 +13,7 @@ generator client {
 // ---------------------------------------------------------
 
 enum UserRole {
-  STUDENT
-  BROKER
-  PARTNER
+  USER
   ADMIN
   SUPER_ADMIN
 }
@@ -25,84 +23,48 @@ enum UserStatus {
   INACTIVE
 }
 
+enum Provider {
+  EMAIL
+  GOOGLE
+  FACEBOOK
+}
+
 // ---------------------------------------------------------
 //  MODEL
 // ---------------------------------------------------------
 
 model User {
-  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  id           String     @id @default(uuid()) @db.Uuid
   firstName    String
   lastName     String?
   phoneNumber  String?
-  email        String     @unique
-  password     String
-  role         UserRole   @default(STUDENT)
+  email        String?    @unique
+  password     String?
+  provider     Provider   @default(EMAIL)
+  role         UserRole   @default(USER)
   status       UserStatus @default(ACTIVE)
   profileImage String?
+  uniqueId     String?
 
-  otp       String?
-  otpExpiry DateTime?
+  otp          String?
+  otpExpiresAt DateTime?
+
+  admins       Admin?
+  isVerified   Boolean @default(false)
+  accessToken  String?
+  refreshToken String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  brokers   Broker?
-  partners  Partner?
-  students  Student?
-  admins    Admin?
 
   @@map("users")
 }
 
-model Broker {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
-
-  email String @unique
-  user  User   @relation(fields: [email], references: [email])
-
-  agency        String?
-  licenseNumber String?
-  webHostedUrl  String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("brokers")
-}
-
-model Partner {
-  id    String @id @default(auto()) @map("_id") @db.ObjectId
-  email String @unique
-  user  User   @relation(fields: [email], references: [email])
-
-  companyName    String?
-  companyAddress String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("partners")
-}
-
-model Student {
-  id        String @id @default(auto()) @map("_id") @db.ObjectId
-  studentId String @unique
-
-  email String @unique
-  user  User   @relation(fields: [email], references: [email])
-
-  discordUsername String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("students")
-}
-
 model Admin {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
+  id String @id @default(uuid()) @db.Uuid
 
-  email String @unique
-  user  User   @relation(fields: [email], references: [email])
+  userId String @unique @map("userId") @db.Uuid // Explicitly set as @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
 
   adminId String @unique
 

@@ -10,6 +10,15 @@ export default {
   stripe_publishable_key: process.env.STRIPE_PUBLISHABLE_KEY,
   stripe_client_id: process.env.STRIPE_CLIENT_ID,
   port: process.env.PORT || 5000,
+
+
+  google_client_id: process.env.GOOGLE_CLIENT_ID,
+  google_client_secret: process.env.GOOGLE_CLIENT_SECRET,
+  facebook_client_id: process.env.FACEBOOK_CLIENT_ID,
+  facebook_client_secret: process.env.FACEBOOK_CLIENT_SECRET,
+  callback_url: process.env.CALLBACK_URL,
+
+
   jwt: {
     jwt_secret: process.env.JWT_SECRET,
     expires_in: process.env.EXPIRES_IN,
@@ -37,5 +46,8 @@ export default {
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     region: process.env.AWS_REGION,
     bucketName: process.env.AWS_BUCKET_NAME,
+  },
+  password: {
+    password_salt: process.env.PASSWORD_SALT
   },
 };
