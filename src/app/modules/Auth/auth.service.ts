@@ -98,6 +98,10 @@ const refreshToken = async (refreshToken: string) => {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found");
   }
 
+  if (user.refreshToken !== refreshToken) {
+    throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid token");
+  }
+
   const accessToken = jwtHelpers.generateToken(
     {
       id: user.id,
@@ -107,6 +111,15 @@ const refreshToken = async (refreshToken: string) => {
     config.jwt.jwt_secret as Secret,
     config.jwt.expires_in as string
   );
+
+  await prisma.user.update({
+    where: {
+      email: user.email,
+    },
+    data: {
+      accessToken: accessToken,
+    },
+  });
 
   return { accessToken };
 };
