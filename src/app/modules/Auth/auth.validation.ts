@@ -1,10 +1,18 @@
-import { z } from "zod";
+import {z} from "zod";
 
-const changePasswordValidationSchema = z.object({
-  oldPassword: z.string().min(8),
-  newPassword: z.string().min(8),
+
+const userValidationSchema = z.object({
+    email: z.string().email(),
+    password: z.string().min(8,"Password must be at least 8 characters"),
+    name: z.string().optional(),
 });
 
-export const authValidation={
-    changePasswordValidationSchema
+const changePasswordValidationSchema = z.object({
+    oldPassword: z.string().min(8),
+    newPassword: z.string().min(8),
+});
+
+export const authValidation = {
+    changePasswordValidationSchema,
+    userValidationSchema
 }

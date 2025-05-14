@@ -1,4 +1,3 @@
-import { UserRole } from "@prisma/client";
 import express from "express";
 import auth from "../../middlewares/auth";
 import validateRequest from "../../middlewares/validateRequest";
@@ -8,7 +7,7 @@ import passport from "../../../helpars/passport";
 
 const router = express.Router();
 
-
+router.post("/create-user", validateRequest(authValidation.userValidationSchema), AuthController.createUser);
 router.post("/login-with-email", AuthController.loginUserWithEmail);
 
 router.get("/login-with-google", passport.authenticate('google', {scope: ['profile', "email"]}));
@@ -49,6 +48,6 @@ router.put(
 
 router.post("/forget-password", AuthController.forgetPassword);
 
-router.post("/reset-password", AuthController.resetPassword);
+router.post("/reset-password", auth(), AuthController.resetPassword);
 
 export const AuthRoutes = router;

@@ -1,5 +1,4 @@
 import {Provider, UserRole, UserStatus} from "@prisma/client";
-import * as bcrypt from "bcryptjs";
 import httpStatus from "http-status";
 import {Secret} from "jsonwebtoken";
 import config from "../../../config";
@@ -9,6 +8,41 @@ import prisma from "../../../shared/prisma";
 import emailSender from "../../../helpars/emailSender/emailSender";
 import {comparePassword, hashPassword} from "../../../helpars/passwordHelpers";
 import {otpEmail} from "../../../emails/otpEmail";
+
+const createUser = async (payload: { email: string, name: string, password: string,role?: string }) => {
+
+    const isUserExist = await prisma.user.findUnique({
+        where: {email: payload.email},
+    });
+    if (isUserExist) {
+        throw new ApiError(httpStatus.BAD_REQUEST, "User already exist with this email!");
+    }
+
+    if (!payload.password) {
+        throw new ApiError(400, "Password required!");
+    }
+
+    if (payload.role === "ADMIN" || payload.role === "SUPER_ADMIN") {
+        throw new ApiError(httpStatus.BAD_REQUEST, "Admin or Super admin already created!");
+    }
+
+    const hashedPassword = await hashPassword(payload.password);
+
+
+    const result = await prisma.user.create({
+        data: {
+            firstName: payload.name,
+            email: payload.email,
+            role: UserRole.USER,
+            password: hashedPassword,
+        },
+    });
+
+    const {password, ...user} = result;
+
+    return user;
+};
+
 
 
 const verifyUserByOTP = async (email: string, otp: string, keepMeLogin?: boolean) => {
@@ -41,19 +75,18 @@ const verifyUserByOTP = async (email: string, otp: string, keepMeLogin?: boolean
         },
     });
 
-    let accessToken;
+    const accessToken = jwtHelpers.generateToken(
+        {
+            id: user.id,
+            role: user.role,
+        },
+        config.jwt.jwt_secret as Secret,
+        config.jwt.expires_in as string
+    );
+
     let refreshToken;
 
     if (keepMeLogin) {
-        accessToken = jwtHelpers.generateToken(
-            {
-                id: user.id,
-                role: user.role,
-            },
-            config.jwt.jwt_secret as Secret,
-            keepMeLogin as boolean
-        );
-
 
         refreshToken = jwtHelpers.generateToken(
             {
@@ -63,15 +96,8 @@ const verifyUserByOTP = async (email: string, otp: string, keepMeLogin?: boolean
             config.jwt.refresh_token_secret as Secret,
             keepMeLogin as boolean
         );
+
     } else {
-        accessToken = jwtHelpers.generateToken(
-            {
-                id: user.id,
-                role: user.role,
-            },
-            config.jwt.jwt_secret as Secret,
-            config.jwt.expires_in as string
-        );
 
         refreshToken = jwtHelpers.generateToken(
             {
@@ -81,6 +107,7 @@ const verifyUserByOTP = async (email: string, otp: string, keepMeLogin?: boolean
             config.jwt.refresh_token_secret as Secret,
             config.jwt.refresh_token_expires_in as string
         );
+
     }
 
 
@@ -97,6 +124,7 @@ const verifyUserByOTP = async (email: string, otp: string, keepMeLogin?: boolean
     return {
         accessToken,
         refreshToken,
+        keepMeLogin
     };
 };
 
@@ -205,20 +233,21 @@ const loginUserWithEmail = async (
             isVerified: userData.isVerified,
             keepMeLogin: keepMeLogin
         };
+
     } else {
-        let accessToken;
+
+        const accessToken = jwtHelpers.generateToken(
+            {
+                id: userData.id,
+                role: userData.role,
+            },
+            config.jwt.jwt_secret as Secret,
+            config.jwt.expires_in as string
+        );
+
         let refreshToken;
 
         if (keepMeLogin) {
-            accessToken = jwtHelpers.generateToken(
-                {
-                    id: userData.id,
-                    role: userData.role,
-                },
-                config.jwt.jwt_secret as Secret,
-                keepMeLogin as boolean
-            );
-
 
             refreshToken = jwtHelpers.generateToken(
                 {
@@ -228,15 +257,8 @@ const loginUserWithEmail = async (
                 config.jwt.refresh_token_secret as Secret,
                 keepMeLogin as boolean
             );
+
         } else {
-            accessToken = jwtHelpers.generateToken(
-                {
-                    id: userData.id,
-                    role: userData.role,
-                },
-                config.jwt.jwt_secret as Secret,
-                config.jwt.expires_in as string
-            );
 
             refreshToken = jwtHelpers.generateToken(
                 {
@@ -246,8 +268,8 @@ const loginUserWithEmail = async (
                 config.jwt.refresh_token_secret as Secret,
                 config.jwt.refresh_token_expires_in as string
             );
-        }
 
+        }
 
         await prisma.user.update({
             where: {
@@ -263,6 +285,7 @@ const loginUserWithEmail = async (
             isVerified: userData.isVerified,
             accessToken,
             refreshToken,
+            keepMeLogin: keepMeLogin
         };
     }
 };
@@ -585,6 +608,7 @@ const resetPassword = async (id: string, password: string) => {
     });
 };
 export const AuthServices = {
+    createUser,
     loginUserWithEmail,
     loginWithGoogle,
     getMyProfile,

@@ -8,6 +8,7 @@ import httpStatus from "http-status";
 import ApiError from "../../errors/ApiErrors";
 import {jwtHelpers} from "../../helpars/jwtHelpers";
 import prisma from "../../shared/prisma";
+import {MyUser} from "../../interfaces";
 
 //  auth(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 
@@ -18,15 +19,8 @@ const auth = (...roles: string[]) => {
         next: NextFunction
     ) => {
         try {
-            // const token = req.headers.authorization;
-            let token = req.cookies.accessToken;
 
-            // if (!token){}
-            //   if (token && token.startsWith("Bearer")) {
-            //       token = token.split(" ")[1];
-            //   } else {
-            //       token = req.cookies.token;
-            //   }
+            let token = req.cookies.accessToken;
 
             if (!token) {
                 throw new ApiError(httpStatus.UNAUTHORIZED, "You are not authorized!");
@@ -39,7 +33,7 @@ const auth = (...roles: string[]) => {
 
             const user = await prisma.user.findUnique({
                 where: {
-                    email: verifiedUser.email,
+                    id: verifiedUser.id,
                 },
             });
 
@@ -57,7 +51,11 @@ const auth = (...roles: string[]) => {
                 throw new ApiError(httpStatus.FORBIDDEN, "Forbidden!");
             }
 
-            req.user = verifiedUser;
+            if (user?.accessToken !== token) {
+                throw new ApiError(401, "Invalid token!");
+            }
+
+            req.user = verifiedUser as MyUser;
 
             next();
         } catch (err) {

@@ -5,6 +5,18 @@ import sendResponse from "../../../shared/sendResponse";
 import {AuthServices} from "./auth.service";
 import ApiError from "../../../errors/ApiErrors";
 
+
+const createUser = catchAsync(async (req: Request, res: Response) => {
+    const result = await AuthServices.createUser(req.body);
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "User created successfully",
+        data: result,
+    });
+});
+
+
 const loginUserWithEmail = catchAsync(async (req: Request, res: Response) => {
 
     const {email, password, keepMeLogin} = req.body;
@@ -22,7 +34,7 @@ const loginUserWithEmail = catchAsync(async (req: Request, res: Response) => {
 
         res.cookie("refreshToken", result.refreshToken, {
             httpOnly: true,
-            maxAge: 7 * 24 * 60 * 60 * 1000,
+            maxAge: result.keepMeLogin ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000,
             sameSite: "none",
             secure: true
         });
@@ -50,7 +62,7 @@ const verifyUserByOTP = catchAsync(async (req: Request, res: Response) => {
 
     res.cookie("refreshToken", result.refreshToken, {
         httpOnly: true,
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        maxAge: result.keepMeLogin ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000,
         sameSite: "none",
         secure: true
     });
@@ -94,7 +106,7 @@ const loginWithGoogle = catchAsync(async (req: Request, res: Response) => {
         // Handle different error types (ApiError or other errors)
         if (error instanceof ApiError) {
             // Redirect to the desired URL if login is failed
-            const redirectUrl = `https://localhost:3000/login?message=${error.message}`;
+            const redirectUrl = `http://localhost:3000/login?message=${error.message}`;
             res.redirect(redirectUrl);
             return sendResponse(res, {
                 statusCode: error.statusCode,
@@ -277,5 +289,6 @@ export const AuthController = {
     changePassword,
     forgetPassword,
     resetPassword,
-    refreshToken
+    refreshToken,
+    createUser
 };
