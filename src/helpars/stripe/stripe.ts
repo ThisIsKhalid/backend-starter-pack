@@ -40,6 +40,34 @@ export const createPaymentIntent = async (budget: number) => {
 };
 
 
+export const createStripeAccount = async (userEmail: string) => {
+  try {
+    // Step 1: Create Stripe Express account
+    const account = await stripe.accounts.create({
+      type: "express",
+      country: "US", // Change based on your country
+      email: userEmail, // Replace with user's email
+      capabilities: {
+        transfers: {requested: true},
+        card_payments: {requested: true},
+      },
+      business_type: 'individual',
+
+      settings: {
+        payouts: {
+          schedule: {
+            interval: "daily", // Payouts are scheduled daily
+          },
+        },
+      },
+    });
+
+    return account?.id;
+  } catch (error) {
+    console.error("Error creating Stripe Express account:", error);
+    throw new Error("Failed to create Stripe account");
+  }
+};
 
 
 export const createStripeCustomer = async (email: string, name: string, paymentMethodId: string) => {
@@ -232,6 +260,81 @@ export const cancelStripeSubscription = async (stripeSubId: string, userId: stri
   } catch (e) {
     console.error("Error cancel subscription:", e);
     throw new Error("Failed cancel subscription");
+  }
+};
+
+
+export const generateAccountLink = async (stripeAccountId: string) => {
+  try {
+
+    // Generate Stripe onboarding link
+    const accountLink = await stripe.accountLinks.create({
+      account: stripeAccountId,
+      refresh_url: `${config.frontend_url}/influencer/stripe/stripe-failed`,
+      return_url: `${config.frontend_url}/influencer/stripe/stripe-success`,
+      type: "account_onboarding",
+    });
+
+    return accountLink.url;
+  } catch (error) {
+    console.error("Error generating Stripe account link:", error);
+    throw new Error("Failed to generate Stripe account link");
+  }
+};
+
+export const getLoginLink = async (stripeAccountId: string) => {
+  try {
+
+    // Generate Stripe login link
+    const loginLink = await stripe.accounts.createLoginLink(stripeAccountId);
+
+    return loginLink.url;
+  } catch (error) {
+    console.error("Error retrieving Stripe login link:", error);
+    throw new Error("Failed to retrieve Stripe login link");
+  }
+};
+
+export const updateStripeAccountStatus = async (stripeAccountId: string) => {
+  try {
+
+    // Fetch Stripe account details
+    const account = await stripe.accounts.retrieve(stripeAccountId);
+
+    return account;
+  } catch (error) {
+    console.error("Error updating Stripe account status:", error);
+    throw new Error("Failed to update Stripe account status");
+  }
+};
+
+
+export const transferFundsToServiceProvider = async (stripeAccountId: string, amount: number) => {
+  console.log(stripeAccountId)
+  // for recharge wallet
+
+  // await stripe.charges.create({
+  //     amount: 2000000,
+  //     currency: "usd",
+  //     source: "tok_bypassPending",
+  //     // transfer_group: "ORDER_" + orderId,
+  // });
+
+  try {
+
+    // Convert amount to cents
+    const amountInCents = Math.round(amount * 100);
+
+    const transfer = await stripe.transfers.create({
+      amount: amountInCents,  // Pass amount in cents
+      currency: "usd",
+      destination: stripeAccountId, // Now sending to the service provider
+    });
+
+    return transfer;
+  } catch (error) {
+    console.error("Error transferring funds:", error);
+    throw new Error("Failed to transfer funds to service provider");
   }
 };
 
