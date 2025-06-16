@@ -1,6 +1,6 @@
 // datasource and generator setup
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
@@ -34,9 +34,8 @@ enum Provider {
 // ---------------------------------------------------------
 
 model User {
-  id           String     @id @default(uuid()) @db.Uuid
-  firstName    String
-  lastName     String?
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  fullName     String
   phoneNumber  String?
   email        String?    @unique
   password     String?
@@ -61,13 +60,10 @@ model User {
 }
 
 model Admin {
-  id String @id @default(uuid()) @db.Uuid
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  userId String @unique @map("userId") @db.Uuid // Explicitly set as @db.Uuid
-  user   User   @relation(fields: [userId], references: [id])
-
-  adminId String @unique
-
+  userId    String   @unique @db.ObjectId // Explicitly set as @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

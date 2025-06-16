@@ -20,7 +20,12 @@ const auth = (...roles: string[]) => {
     ) => {
         try {
 
-            let token = req.cookies.accessToken;
+            let token = req.headers["authorization"]
+            if (!token) {
+                token = req.cookies.accessToken
+            }
+
+            // let token = req.cookies.accessToken;
 
             if (!token) {
                 throw new ApiError(httpStatus.UNAUTHORIZED, "You are not authorized!");
@@ -50,10 +55,11 @@ const auth = (...roles: string[]) => {
             if (roles.length && !roles.includes(verifiedUser.role)) {
                 throw new ApiError(httpStatus.FORBIDDEN, "Forbidden!");
             }
+            console.log(token)
 
-            if (user?.accessToken !== token) {
-                throw new ApiError(401, "Invalid token!");
-            }
+            // if (user?.accessToken !== token) {
+            //     throw new ApiError(401, "Invalid token!");
+            // }
 
             req.user = verifiedUser as MyUser;
 

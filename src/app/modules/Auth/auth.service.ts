@@ -8,8 +8,9 @@ import prisma from "../../../shared/prisma";
 import emailSender from "../../../helpars/emailSender/emailSender";
 import {comparePassword, hashPassword} from "../../../helpars/passwordHelpers";
 import {otpEmail} from "../../../emails/otpEmail";
+import {IUser} from "./auth.validation";
 
-const createUser = async (payload: { email: string, name: string, password: string,role?: string }) => {
+const createUser = async (payload: { email: string, fullName: string, password: string,role?: string }) => {
 
     const isUserExist = await prisma.user.findUnique({
         where: {email: payload.email},
@@ -31,12 +32,28 @@ const createUser = async (payload: { email: string, name: string, password: stri
 
     const result = await prisma.user.create({
         data: {
-            firstName: payload.name,
+            fullName: payload.fullName,
             email: payload.email,
-            role: UserRole.USER,
             password: hashedPassword,
         },
     });
+
+    const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
+
+    await prisma.user.update({
+        where: {
+            id: result.id,
+        },
+        data: {
+            otp: randomOtp,
+            otpExpiresAt: otpExpiry,
+        },
+    });
+
+    const html = otpEmail(randomOtp);
+
+    await emailSender("OTP", result.email as string, html);
 
     const {password, ...user} = result;
 
@@ -44,6 +61,60 @@ const createUser = async (payload: { email: string, name: string, password: stri
 };
 
 
+const updatePartnerProfile = async (id: string, profileImgUrl: string, payload: IUser) => {
+    // Check if the user exists
+    const existingUser = await prisma.user.findUnique({
+        where: {id}
+    });
+
+    if (!existingUser) {
+        throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+    }
+
+    // Prevent updating password or role
+
+
+    if (payload.email) {
+
+        const isEmailExist = await prisma.user.findFirst({
+            where: {
+                email: payload.email,
+                id: {
+                    not: id
+                }
+            }
+        });
+
+        if (isEmailExist) {
+            throw new ApiError(httpStatus.BAD_REQUEST, "This email is already taken!");
+        }
+    }
+
+    let hashedPassword
+
+    if (payload.oldPassword && payload.newPassword) {
+        const isCorrectPassword = await comparePassword(payload.oldPassword, existingUser.password as string)
+
+        if (!isCorrectPassword) {
+            throw new ApiError(httpStatus.BAD_REQUEST, "Incorrect old password!");
+        }
+
+        hashedPassword = await hashPassword(payload.newPassword);
+    }
+
+
+    // Update the user profile
+    return await prisma.user.update({
+        where: {id},
+        data: {
+            fullName: payload.fullName || existingUser.fullName,
+            email: payload.email || existingUser.email,
+            profileImage: profileImgUrl || existingUser.profileImage,
+            password: hashedPassword || existingUser.password
+        }
+    });
+
+}
 
 const verifyUserByOTP = async (email: string, otp: string, keepMeLogin?: boolean) => {
     const user = await prisma.user.findUnique({
@@ -130,13 +201,15 @@ const verifyUserByOTP = async (email: string, otp: string, keepMeLogin?: boolean
 
 const refreshToken = async (refreshToken: string) => {
 
+    // console.log("Refresh token: ", refreshToken);
+
     const decodedToken = jwtHelpers.verifyToken(
         refreshToken,
         config.jwt.refresh_token_secret as Secret
     );
 
     if (!decodedToken) {
-        throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid token");
+        throw new ApiError(httpStatus.FORBIDDEN, "refresh_token_expired");
     }
 
     const user = await prisma.user.findUnique({
@@ -290,8 +363,9 @@ const loginUserWithEmail = async (
     }
 };
 
+
 const loginWithGoogle = async (payload: {
-    name: string,
+    fullName: string,
     email: string,
     profileImage: string,
     uniqueId: string
@@ -306,7 +380,7 @@ const loginWithGoogle = async (payload: {
     if (!userData) {
         const newUser = await prisma.user.create({
             data: {
-                firstName: payload.name,
+                fullName: payload.fullName,
                 email: payload.email,
                 profileImage: payload?.profileImage,
                 provider: Provider.GOOGLE,
@@ -388,7 +462,7 @@ const loginWithGoogle = async (payload: {
 }
 
 const loginWithFacebook = async (payload: {
-    name: string,
+    fullName: string,
     email?: string,
     profileImage: string,
     uniqueId: string
@@ -403,7 +477,7 @@ const loginWithFacebook = async (payload: {
     if (!userData) {
         const newUser = await prisma.user.create({
             data: {
-                firstName: payload.name,
+                fullName: payload.fullName,
                 email: payload.email,
                 profileImage: payload?.profileImage,
                 provider: Provider.FACEBOOK,
@@ -607,6 +681,7 @@ const resetPassword = async (id: string, password: string) => {
         },
     });
 };
+
 export const AuthServices = {
     createUser,
     loginUserWithEmail,
@@ -617,5 +692,6 @@ export const AuthServices = {
     resetPassword,
     verifyUserByOTP,
     refreshToken,
-    loginWithFacebook
+    loginWithFacebook,
+    updatePartnerProfile
 };

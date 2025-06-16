@@ -3,9 +3,14 @@ import {z} from "zod";
 
 const userValidationSchema = z.object({
     email: z.string().email(),
-    password: z.string().min(8,"Password must be at least 8 characters"),
-    name: z.string().optional(),
+    password: z.string().min(8, "Password must be at least 8 characters").optional(),
+    fullName: z.string().optional(),
+    profileImage: z.string().url().optional(),
+    oldPassword: z.string().optional(),
+    newPassword: z.string().optional(),
 });
+
+const updateProfileSchema = userValidationSchema.partial()
 
 const changePasswordValidationSchema = z.object({
     oldPassword: z.string().min(8),
@@ -14,5 +19,8 @@ const changePasswordValidationSchema = z.object({
 
 export const authValidation = {
     changePasswordValidationSchema,
-    userValidationSchema
+    userValidationSchema,
+    updateProfileSchema
 }
+
+export type IUser = z.infer<typeof userValidationSchema>;

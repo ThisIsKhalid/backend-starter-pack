@@ -4,7 +4,8 @@ import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
 import {AuthServices} from "./auth.service";
 import ApiError from "../../../errors/ApiErrors";
-
+import {authValidation} from "./auth.validation";
+import config from "../../../config";
 
 const createUser = catchAsync(async (req: Request, res: Response) => {
     const result = await AuthServices.createUser(req.body);
@@ -16,6 +17,47 @@ const createUser = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+
+const updatePartnerProfile = catchAsync(async (req: Request, res: Response) => {
+
+    // @ts-ignore
+    const userId = req.user.id
+    const file: any = req.file;
+
+    let profileImgUrl: any;
+    if (file) {
+
+        // profileImgUrl = await fileUploadToS3(
+        //     "profilePhoto",
+        //     "Profile",
+        //     file.originalname,
+        //     file.mimetype,
+        //     file.path
+        // );
+
+        profileImgUrl = `${config.backend_image_url}/ProfileFile/${file.filename}`;
+    }
+
+    const data = req.body.data && JSON.parse(req.body.data)
+
+    const validationResult = authValidation.updateProfileSchema.safeParse(data);
+
+    if (!validationResult.success) {
+        return res.status(httpStatus.BAD_REQUEST).json({
+            success: false,
+            message: "Validation Error",
+            errors: validationResult.error.errors,
+        });
+    }
+
+    const result = await AuthServices.updatePartnerProfile(userId, profileImgUrl, data);
+    sendResponse(res, {
+        statusCode: httpStatus.CREATED,
+        success: true,
+        message: "Profile updated successfully",
+        data: result,
+    });
+});
 
 const loginUserWithEmail = catchAsync(async (req: Request, res: Response) => {
 
@@ -106,7 +148,7 @@ const loginWithGoogle = catchAsync(async (req: Request, res: Response) => {
         // Handle different error types (ApiError or other errors)
         if (error instanceof ApiError) {
             // Redirect to the desired URL if login is failed
-            const redirectUrl = `http://localhost:3000/login?message=${error.message}`;
+            const redirectUrl = `http://localhost:3000/auth/login?message=${error.message}`;
             res.redirect(redirectUrl);
             return sendResponse(res, {
                 statusCode: error.statusCode,
@@ -258,9 +300,12 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
 });
 
 
-
 const refreshToken = catchAsync(async (req: Request, res: Response) => {
-    const refreshToken = req.cookies.refreshToken;
+
+    let refreshToken = req.headers["authorization"]
+    if (!refreshToken) {
+        refreshToken = req.cookies.refreshToken
+    }
 
     const result = await AuthServices.refreshToken(refreshToken as string);
 
@@ -279,6 +324,7 @@ const refreshToken = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+
 export const AuthController = {
     loginUserWithEmail,
     loginWithGoogle,
@@ -289,6 +335,7 @@ export const AuthController = {
     changePassword,
     forgetPassword,
     resetPassword,
+    createUser,
     refreshToken,
-    createUser
+    updatePartnerProfile
 };
