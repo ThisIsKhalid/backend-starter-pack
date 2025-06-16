@@ -59,19 +59,6 @@ const GlobalErrorHandler = (
       : [];
   }
 
-  // Handle Errors
-  else if (error instanceof Error) {
-    message = error?.message;
-    errorMessages = error?.message
-      ? [
-          {
-            path: "",
-            message: error?.message,
-          },
-        ]
-      : [];
-  }
-
   // Prisma Client Initialization Error
   else if (error instanceof Prisma.PrismaClientInitializationError) {
     statusCode = httpStatus.INTERNAL_SERVER_ERROR;
@@ -138,16 +125,93 @@ const GlobalErrorHandler = (
         message: "Reference Error",
       },
     ];
-  } else if (error instanceof TokenExpiredError) {
-    statusCode = 401;
-    message = "Your session has expired. Please log in again.";
+  }
+  // else if (error instanceof TokenExpiredError) {
+  //   statusCode = 401;
+  //   message = "Your session has expired. Please log in again.";
+  //   errorMessages = [
+  //     {
+  //       path: "token",
+  //       message: `Token expired at ${error.expiredAt.toISOString()}`,
+  //     },
+  //   ];
+  // }
+  else if (error?.code === "P2002") {
+    // Handle Prisma Duplicate entity error
+    statusCode = 409;
+    message = `Duplicate entity on the fields: ${error.meta?.target?.join(
+      ", "
+    )}`;
     errorMessages = [
       {
-        path: "token",
-        message: `Token expired at ${error.expiredAt.toISOString()}`,
+        path: error.meta?.target?.join(", ") || "",
+        message: `Duplicate entity on the fields: ${error.meta?.target}`,
+      },
+    ];
+  } else if (error?.code === "P2003") {
+    // Handle Prisma Foreign Key constraint error
+    statusCode = 400;
+    message = `Foreign key constraint failed on the field: ${error.meta?.field_name}`;
+    errorMessages = [
+      {
+        path: error.meta?.field_name || "",
+        message: `Foreign key constraint failed on the field: ${error.meta?.field_name} in model ${error.meta?.modelName}`,
+      },
+    ];
+  } else if (error?.code === "P2011") {
+    // Handle Prisma Null constraint violation error
+    statusCode = 400;
+    message = `Null constraint violation on the field: ${error.meta?.field_name}`;
+    errorMessages = [
+      {
+        path: error.meta?.field_name || "",
+        message: `Null constraint violation on the field: ${error.meta?.field_name}`,
+      },
+    ];
+  } else if (error?.code === "P2025") {
+    // Handle Prisma Record not found error
+    statusCode = 404;
+    message = `Record not found for the model: ${error.meta?.model}`;
+    errorMessages = [
+      {
+        path: error.meta?.cause,
+        message: `${
+          error.meta?.cause ||
+          "No matching record found for the given criteria."
+        }`,
       },
     ];
   }
+
+  // Handle Errors
+  else if (error instanceof Error) {
+    if (error.name === "TokenExpiredError") {
+      statusCode = 401;
+      message = "Your session has expired. Please log in again.";
+      errorMessages = [
+        {
+          path: "token",
+          message:
+            error && "expiredAt" in error && error.expiredAt
+              ? `Token expired at ${new Date(
+                  (error as any).expiredAt
+                ).toISOString()}`
+              : "Token has expired.",
+        },
+      ];
+    }
+
+    message = error?.message;
+    errorMessages = error?.message
+      ? [
+          {
+            path: "",
+            message: error?.message,
+          },
+        ]
+      : [];
+  }
+
   // Catch any other error type
   else {
     message = "An unexpected error occurred!";
