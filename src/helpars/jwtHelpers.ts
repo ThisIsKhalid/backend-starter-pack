@@ -14,7 +14,7 @@ const generateToken = (
     } else {
         token = jwt.sign(payload, secret, {
             algorithm: "HS256",
-            expiresIn: expiresIn ? '30d' : '2d',
+            expiresIn: expiresIn ? '30d' : '7d',
         });
     }
 
