@@ -4,8 +4,8 @@ import httpStatus from "http-status";
 import { Secret } from "jsonwebtoken";
 import config from "../../config";
 import ApiError from "../../errors/ApiErrors";
-import { jwtHelpers } from "../../helpars/jwtHelpers";
 import prisma from "../../shared/prisma";
+import { jwtHelpers } from "../../utils/jwtHelpers";
 
 //  auth(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 

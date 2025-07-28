@@ -1,3 +1,4 @@
+import { UserStatus } from "@prisma/client";
 import bcrypt from "bcrypt";
 import httpStatus from "http-status";
 import { Secret } from "jsonwebtoken";
@@ -5,12 +6,9 @@ import config from "../../../config";
 import { otpEmail } from "../../../emails/otpEmail";
 import ApiError from "../../../errors/ApiErrors";
 import emailSender from "../../../helpars/emailSender/emailSender";
-import { jwtHelpers } from "../../../helpars/jwtHelpers";
-import {
-  comparePassword,
-  hashPassword,
-} from "../../../helpars/passwordHelpers";
 import prisma from "../../../shared/prisma";
+import { jwtHelpers } from "../../../utils/jwtHelpers";
+import { comparePassword, hashPassword } from "../../../utils/passwordHelpers";
 
 const verifyUserByOTP = async (email: string, otp: string) => {
   const user = await prisma.user.findUnique({
@@ -139,6 +137,10 @@ const loginUser = async (
     throw new ApiError(404, "User not found");
   }
 
+  if (userData.status === UserStatus.DELETED) {
+    throw new ApiError(403, "Your account is deleted");
+  }
+
   if (!password || !userData?.password) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Password is required");
   }
@@ -171,11 +173,15 @@ const loginUser = async (
     await emailSender("OTP", userData.email, html);
 
     return {
-      id: userData.id,
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      email: userData.email,
-      role: userData.role,
+      data: {
+        id: userData.id,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        email: userData.email,
+        role: userData.role,
+      },
+      message:
+        "Please verify your email with the OTP sent to your email address.",
     };
   } else {
     const accessToken = jwtHelpers.generateToken(
@@ -219,8 +225,11 @@ const loginUser = async (
     });
 
     return {
-      accessToken,
-      refreshToken,
+      data: {
+        accessToken,
+        refreshToken,
+      },
+      message: "Login successful",
     };
   }
 };
@@ -239,9 +248,17 @@ const getMyProfile = async (email: string) => {
       id: true,
       firstName: true,
       lastName: true,
+      image: true,
       email: true,
       role: true,
       isVerified: true,
+      privacyPolicyAccepted: true,
+      phoneNumber: true,
+      dateOfBirth: true,
+      address: true,
+      createdAt: true,
+      updatedAt: true,
+      status: true,
     },
   });
 

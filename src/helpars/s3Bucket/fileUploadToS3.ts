@@ -3,7 +3,7 @@ import fs from "fs";
 import multer from "multer";
 import path from "path";
 import config from "../../config";
-import { fileFilter } from "../fileFilter";
+import { fileFilter } from "../file/fileFilter";
 
 // Initialize S3 client
 export const s3Client = new S3Client({

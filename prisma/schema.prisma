@@ -13,13 +13,26 @@ enum UserRole {
   ADMIN
 }
 
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
 model User {
   id String @id @default(cuid())
 
-  firstName String
-  lastName  String
-  email     String @unique
-  password  String
+  firstName             String
+  lastName              String?
+  email                 String  @unique
+  image                 String?
+  password              String?
+  privacyPolicyAccepted Boolean @default(false)
+
+  phoneNumber String?
+  dateOfBirth DateTime?
+  address     String?
+  status      UserStatus @default(ACTIVE)
 
   role UserRole @default(USER)
 
@@ -27,11 +40,26 @@ model User {
   otpExpiresAt DateTime?
   isVerified   Boolean   @default(false)
 
+  stripeCustomerId String?
+  provider String?
+
   accessToken  String?
   refreshToken String?
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@map("users")
+}
+
+
+model Test {
+  id String @id @default(cuid())
+
+  name String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@map("users")
+  @@map("tests")
 }
