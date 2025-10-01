@@ -1,0 +1,16 @@
+model Company {
+    id String @id @default(auto()) @map("_id") @db.ObjectId
+
+    companyName String
+    country     String
+    city        String
+    companySize String
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // relations
+    employers Employer[]
+
+    @@map("companies")
+}
