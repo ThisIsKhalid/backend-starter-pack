@@ -1,0 +1,87 @@
+enum UserRole {
+    DEEN_USER
+    EMPLOYER
+    UNKNOWN_USER
+    ADMIN
+    SUPER_ADMIN
+}
+
+enum UserStatus {
+    ACTIVE
+    BLOCKED
+}
+
+enum AuthProvider {
+    EMAIL
+    GOOGLE
+}
+
+model User {
+    id String @id @default(auto()) @map("_id") @db.ObjectId
+
+    firstName    String
+    lastName     String
+    email        String       @unique
+    image        String?
+    password     String?
+    role         UserRole     @default(UNKNOWN_USER)
+    status       UserStatus   @default(ACTIVE)
+    authProvider AuthProvider @default(EMAIL)
+
+    isEmailVerified          Boolean @default(false)
+    isAcceptedTermsAndPolicy Boolean @default(false)
+    isAgreedToReceiveEmails  Boolean @default(false)
+
+    accessToken  String? // for session management
+    refreshToken String? // for session management
+    otp          String? // for email verification and password reset
+    otpExpiry    DateTime?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // relations
+    deenUsers DeenUser?
+    employers Employer?
+
+    @@map("users")
+}
+
+model DeenUser {
+    id String @id @default(auto()) @map("_id") @db.ObjectId
+
+    userId String @unique @db.ObjectId
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    // additional fields specific to Deen users can be added here
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("deen_users")
+}
+
+enum Plan {
+    FREE
+    ESSENTIAL
+    PRO
+}
+
+model Employer {
+    id String @id @default(auto()) @map("_id") @db.ObjectId
+
+    userId String @unique @db.ObjectId
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    employeePlan Plan @default(FREE)
+    telephone    String?
+
+    companyProfileURL String?
+    companyId         String?  @db.ObjectId
+    company           Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("employers")
+}
