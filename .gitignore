@@ -1,4 +1,6 @@
 node_modules
+temp_auto_push.bat
 dist
 .vercel
-.env
+.gitignore
+branch_structure.json
