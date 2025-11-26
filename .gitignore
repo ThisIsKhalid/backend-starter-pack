@@ -1,6 +1,2 @@
+config.bat
 node_modules
-dist
-.vercel
-
-*.log
-*.log.*
