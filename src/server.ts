@@ -1,5 +1,6 @@
 import { Server } from "http";
 import app from "./app";
+import config from "./config";
 
 let server: Server;
 
@@ -8,8 +9,8 @@ async function main() {
     // 1. Connect to database
     // 2. Initialize data in DB ( if there any , ex: admin or super admin)
     // 3. Start HTTP server
-    server = app.listen(8000, () => {
-      console.log(`Server is running on port 8000`);
+    server = app.listen(config.port, () => {
+      console.log(`Server is running on port ${config.port}`);
     });
 
     // Handle server errors

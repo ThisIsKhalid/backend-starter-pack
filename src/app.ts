@@ -1,5 +1,6 @@
 import cors from "cors";
 import express, { Application, NextFunction, Request, Response } from "express";
+import router from "./app/routes";
 
 // Initialize app
 const app: Application = express();
@@ -39,6 +40,7 @@ app.get("/", (req: Request, res: Response) => {
 });
 
 // Routes
+app.use("/api/v1", router)
 
 // Health check endpoint
 app.get("/api/v1/health", async (req: Request, res: Response) => {

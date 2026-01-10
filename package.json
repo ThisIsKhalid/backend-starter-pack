@@ -20,6 +20,7 @@
   "homepage": "https://github.com/ThisIsKhalid/backend-starter-pack#readme",
   "dependencies": {
     "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
     "express": "^5.2.1"
   },
   "devDependencies": {
