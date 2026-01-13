@@ -1,6 +1,8 @@
 import cors from "cors";
 import express, { Application, NextFunction, Request, Response } from "express";
+import responseTime from "response-time";
 import router from "./app/routes";
+import logger from "./utils/logger/logger";
 
 // Initialize app
 const app: Application = express();
@@ -39,8 +41,51 @@ app.get("/", (req: Request, res: Response) => {
   });
 });
 
+// Log incoming requests
+app.use(
+  responseTime((req: Request, res: Response, time: number) => {
+    const timeInMs = time.toFixed(2);
+    const timeCategory =
+      time < 100
+        ? "VERY FAST"
+        : time < 200
+        ? "FAST"
+        : time < 500
+        ? "NORMAL"
+        : time < 1000
+        ? "SLOW"
+        : time < 5000
+        ? "VERY_SLOW"
+        : "CRITICAL";
+
+    // Skip logging for streaming requests to reduce noise
+    if (!req.path.includes("/stream/")) {
+      logger.info({
+        message: `Request processed - ${timeCategory}: ${timeInMs}ms - ${req.method} ${req.originalUrl}`,
+        method: req.method,
+        url: req.originalUrl,
+        responseTime: `${timeInMs}ms`,
+        timeCategory,
+        statusCode: res.statusCode,
+        // userAgent: req.get("User-Agent"),
+        // ip: req.ip,
+      });
+    }
+
+    // Alert for performance issues
+    if (time > 1000) {
+      logger.warn({
+        message: `Performance concern: ${req.method} ${req.originalUrl}`,
+        responseTime: `${timeInMs}ms`,
+        statusCode: res.statusCode,
+        alert: "SLOW_RESPONSE",
+      });
+    }
+  })
+);
+
 // Routes
-app.use("/api/v1", router)
+app.use("/api/v1", router);
 
 // Health check endpoint
 app.get("/api/v1/health", async (req: Request, res: Response) => {

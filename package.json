@@ -19,13 +19,20 @@
   },
   "homepage": "https://github.com/ThisIsKhalid/backend-starter-pack#readme",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "response-time": "^2.3.4",
+    "winston": "^3.19.0",
+    "winston-daily-rotate-file": "^5.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/response-time": "^2.3.9",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.3"
   }
