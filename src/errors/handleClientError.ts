@@ -1,7 +1,8 @@
 import { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { IGenericErrorMessage } from "../interfaces/common";
 
-const handleClientError = (error: Prisma.PrismaClientKnownRequestError) => {
+const handleClientError = (error: PrismaClientKnownRequestError) => {
   let errors: IGenericErrorMessage[] = [];
   let message = "";
   const statusCode = 400;
@@ -24,6 +25,13 @@ const handleClientError = (error: Prisma.PrismaClientKnownRequestError) => {
         },
       ];
     }
+  } else if (error.code === "P2002") {
+    const target = (error.meta?.target as string[]) || [];
+    message = `Duplicate value for field: ${target.join(", ")}`;
+    errors = [{ path: target.join(", "), message }];
+  } else {
+    message = error.message || "Something went wrong!";
+    errors = [{ path: "", message }];
   }
 
   return {
