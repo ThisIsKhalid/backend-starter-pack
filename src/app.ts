@@ -2,6 +2,7 @@ import cors from "cors";
 import express, { Application, NextFunction, Request, Response } from "express";
 import responseTime from "response-time";
 import router from "./app/routes";
+import config from "./config";
 import logger from "./utils/logger/logger";
 
 // Initialize app
@@ -9,9 +10,9 @@ const app: Application = express();
 
 // Cors Options
 const corsOptions = {
-  origin: "",
+  origin: config.env === "production" ? process.env.CORS_ORIGIN : "*",
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  allowedHeaders: [
+  ALLOWED_HEADERS: [
     "Content-Type",
     "Authorization",
     "x-client-type",

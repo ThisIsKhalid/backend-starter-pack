@@ -26,10 +26,10 @@ const fileFormat = format.combine(
 
 const infoTransport = new DailyRotateFile({
   filename: path.join(logDir, "info-%DATE%.log"),
-  datePattern: "YYYY-MM-DD-HH-mm", // rotate every minute
+  datePattern: "YYYY-MM-DD", // rotate daily
   level: "info",
   zippedArchive: false,
-  maxFiles: "15m", // keep last 15 logs (~15 min)
+  maxFiles: "14d", // keep last 14 days
   utc: true,
 });
 

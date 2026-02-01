@@ -1,10 +1,10 @@
 import { Prisma } from "@prisma/client";
 import {
-  PrismaClientInitializationError,
-  PrismaClientKnownRequestError,
-  PrismaClientRustPanicError,
-  PrismaClientUnknownRequestError,
-  PrismaClientValidationError,
+    PrismaClientInitializationError,
+    PrismaClientKnownRequestError,
+    PrismaClientRustPanicError,
+    PrismaClientUnknownRequestError,
+    PrismaClientValidationError,
 } from "@prisma/client/runtime/library";
 import { NextFunction, Request, Response } from "express";
 import httpStatus from "http-status";
@@ -18,7 +18,7 @@ import handleZodError from "../../errors/handleZodError";
 import { IGenericErrorMessage } from "../../interfaces/common";
 
 const GlobalErrorHandler = (
-  error: any,
+  error: any, // eslint-disable-line @typescript-eslint/no-explicit-any
   req: Request,
   res: Response,
   next: NextFunction,
@@ -28,7 +28,7 @@ const GlobalErrorHandler = (
     return next(error);
   }
 
-  let statusCode: any = httpStatus.INTERNAL_SERVER_ERROR;
+  let statusCode: number = httpStatus.INTERNAL_SERVER_ERROR;
   let message = error.message || "Something went wrong!";
   let errorMessages: IGenericErrorMessage[] = [];
 
@@ -169,7 +169,6 @@ const GlobalErrorHandler = (
       },
     ];
   } else if (error instanceof TokenExpiredError) {
-    console.log("object");
     statusCode = 401;
     message = "Your session has expired. Please log in again.";
     errorMessages = [

@@ -26,6 +26,11 @@ const createUser = async (userData: IUser) => {
       name: userData.name,
       password: hashpassword,
     },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
   });
 
   if (!user) {
