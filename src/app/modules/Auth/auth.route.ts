@@ -1,13 +1,11 @@
 import express, { Request, Response } from "express";
 import auth from "../../middlewares/auth";
+import { AuthController } from "./auth.controller";
 
 const router = express.Router();
 
-router.get("/me", auth("USER"), (req: Request, res: Response) => {
-  res.status(200).json({
-    status: "Success",
-    message: "Get me",
-  });
-});
+router.post("/register", AuthController.createUser);
+
+router.get("/me", auth("USER"), AuthController.getMe);
 
 export const AuthRoutes = router;

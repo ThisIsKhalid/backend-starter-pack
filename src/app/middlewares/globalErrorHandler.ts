@@ -1,28 +1,27 @@
+import { Prisma } from "@prisma/client";
+import {
+  PrismaClientInitializationError,
+  PrismaClientKnownRequestError,
+  PrismaClientRustPanicError,
+  PrismaClientUnknownRequestError,
+  PrismaClientValidationError,
+} from "@prisma/client/runtime/library";
 import { NextFunction, Request, Response } from "express";
 import httpStatus from "http-status";
 import { TokenExpiredError } from "jsonwebtoken";
 import multer from "multer";
 import { ZodError } from "zod";
 import config from "../../config";
+import ApiError from "../../errors/apiError";
+import handleClientError from "../../errors/handleClientError";
 import handleZodError from "../../errors/handleZodError";
 import { IGenericErrorMessage } from "../../interfaces/common";
-import { Prisma } from "@prisma/client";
-import {
-  PrismaClientKnownRequestError,
-  PrismaClientInitializationError,
-  PrismaClientRustPanicError,
-  PrismaClientUnknownRequestError,
-  PrismaClientValidationError,
-} from "@prisma/client/runtime/library";
-import handleClientError from "../../errors/handleClientError";
-import ApiError from "../../errors/apiError";
-
 
 const GlobalErrorHandler = (
   error: any,
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   if (res.headersSent) {
     console.error("Headers already sent, delegating to default error handler");
@@ -124,9 +123,7 @@ const GlobalErrorHandler = (
         message: "Prisma Client Unknown Request Error",
       },
     ];
-  }
-
-  if (error instanceof multer.MulterError) {
+  } else if (error instanceof multer.MulterError) {
     statusCode = httpStatus.BAD_REQUEST;
 
     if (error.code === "LIMIT_FILE_SIZE") {
