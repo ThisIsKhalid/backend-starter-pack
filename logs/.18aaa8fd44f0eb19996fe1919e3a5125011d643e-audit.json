@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/khalid/Projects/Personal/backend-starter-pack/logs/.18aaa8fd44f0eb19996fe1919e3a5125011d643e-audit.json",
+    "files": [
+        {
+            "date": 1769915670678,
+            "name": "/Users/khalid/Projects/Personal/backend-starter-pack/logs/info-2026-02-01.log",
+            "hash": "1b93d449f018da01ecbc5db3dc07fd4c737c5efb758c5a47c493970a163dbdab"
+        }
+    ],
+    "hashType": "sha256"
+}
