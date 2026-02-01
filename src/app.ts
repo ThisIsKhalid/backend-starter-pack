@@ -1,5 +1,6 @@
 import cors from "cors";
 import express, { Application, NextFunction, Request, Response } from "express";
+import helmet from "helmet";
 import responseTime from "response-time";
 import router from "./app/routes";
 import config from "./config";
@@ -30,6 +31,7 @@ const corsOptions = {
 };
 
 // Middlewares
+app.use(helmet());
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

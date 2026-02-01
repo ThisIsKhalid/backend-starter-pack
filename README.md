@@ -11,7 +11,7 @@ A robust, production-ready backend starter pack built with **Node.js**, **Expres
 - **Error Handling**: Centralized global error handler.
 - **Logging**: Production-grade logging with Winston and daily rotation.
 - **Security**: 
-  - Helmet (recommended to add)
+  - Helmet (HTTP headers protection)
   - CORS configured
   - Explicit database connection management
   - Graceful shutdown handling
