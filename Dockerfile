@@ -1,41 +1,37 @@
 # ---- Build Stage ----
-FROM node:20-alpine AS builder
+FROM cgr.dev/chainguard/node:latest-dev AS builder
 
 WORKDIR /app
+
+ENV NODE_ENV=development
 
 COPY package*.json ./
 COPY prisma ./prisma/
 
-RUN npm ci --only=production && npm ci
+RUN npm ci
 
 COPY . .
 
-RUN npm run build
+RUN npx prisma generate && npm run build && npm prune --omit=dev && npm cache clean --force
 
 
 # ---- Production Stage ----
-FROM node:20-alpine AS production
+FROM gcr.io/distroless/nodejs22-debian12:nonroot AS production
 
 WORKDIR /app
 
-# Install only runtime dependencies
-COPY package*.json ./
-COPY prisma ./prisma/
+ENV NODE_ENV=production
 
-RUN npm ci --only=production && npx prisma generate
-
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
-
-# Non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodeuser -u 1001 -G nodejs && \
-    chown -R nodeuser:nodejs /app
-
-USER nodeuser
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:8000/api/v1/health || exit 1
+  CMD ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:8000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 
-CMD ["node", "dist/server.js"]
+ENTRYPOINT ["/nodejs/bin/node"]
+
+CMD ["dist/server.js"]
