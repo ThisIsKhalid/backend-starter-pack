@@ -1,0 +1,66 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      target: production
+    container_name: backend_app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=mongodb://mongo:27017/${MONGO_DB_NAME:-backend_starter}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend_network
+
+  mongo:
+    image: mongo:7
+    container_name: backend_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: backend_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - backend_network
+
+volumes:
+  mongo_data:
+  redis_data:
+
+networks:
+  backend_network:
+    driver: bridge

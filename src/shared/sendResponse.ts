@@ -11,15 +11,22 @@ const sendResponse = <T>(
       limit: number;
       total: number;
     };
-    data: T | null | undefined;
+    data?: T | null;
   }
 ) => {
-  res.status(jsonData.statusCode).json({
+  const responseBody: Record<string, unknown> = {
     success: jsonData.success,
     message: jsonData.message,
-    meta: jsonData.meta || null || undefined,
-    data: jsonData.data || null || undefined,
-  });
+  };
+
+  if (jsonData.meta !== undefined) {
+    responseBody.meta = jsonData.meta;
+  }
+
+  // Preserve falsy values (0, false, "") — only exclude undefined
+  responseBody.data = jsonData.data !== undefined ? jsonData.data : null;
+
+  res.status(jsonData.statusCode).json(responseBody);
 };
 
 export default sendResponse;

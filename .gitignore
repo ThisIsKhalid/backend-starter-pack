@@ -1,3 +1,36 @@
-node_modules
-dist
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Uploads
+uploads/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Testing
+coverage/
+
+# Prisma
 /generated/prisma
+
+# TypeScript
+*.tsbuildinfo
+
