@@ -25,6 +25,6 @@ export const fileFilter = (
   if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error(`Invalid file type. Only ${allowedMimeTypes.join(", ")} are allowed`), false);
+    cb(new Error(`Invalid file type. Only ${allowedMimeTypes.join(", ")} are allowed`));
   }
 };
