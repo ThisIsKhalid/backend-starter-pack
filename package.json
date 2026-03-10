@@ -9,6 +9,8 @@
     "start": "node dist/server.js",
     "lint": "eslint src --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
+    "module:create": "node scripts/create-module.js",
+    "module:create:no-route": "node scripts/create-module.js --no-route",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",

@@ -248,20 +248,22 @@ Copy from `.env.example` and update as needed.
 
 ## Available Scripts
 
-| Script                    | What it does                                   |
-| ------------------------- | ---------------------------------------------- |
-| `npm run dev`             | Start development server with auto-restart     |
-| `npm run build`           | Compile TypeScript to `dist/`                  |
-| `npm run start`           | Run compiled server from `dist/server.js`      |
-| `npm run lint`            | Run ESLint on `src` and auto-fix               |
-| `npm run format`          | Run Prettier on `src/**/*.ts`                  |
-| `npm run prisma:generate` | Generate Prisma client                         |
-| `npm run prisma:migrate`  | Prisma migrate command (mostly for SQL setups) |
-| `npm run prisma:studio`   | Open Prisma Studio                             |
-| `npm run prisma:seed`     | Seed default users                             |
-| `npm test`                | Run tests in-band                              |
-| `npm run test:watch`      | Run tests in watch mode                        |
-| `npm run test:coverage`   | Generate coverage report                       |
+| Script                                     | What it does                                           |
+| ------------------------------------------ | ------------------------------------------------------ |
+| `npm run dev`                              | Start development server with auto-restart             |
+| `npm run build`                            | Compile TypeScript to `dist/`                          |
+| `npm run start`                            | Run compiled server from `dist/server.js`              |
+| `npm run lint`                             | Run ESLint on `src` and auto-fix                       |
+| `npm run format`                           | Run Prettier on `src/**/*.ts`                          |
+| `npm run module:create -- <Name>`          | Generate a new module scaffold and auto-register route |
+| `npm run module:create:no-route -- <Name>` | Generate module scaffold without route registration    |
+| `npm run prisma:generate`                  | Generate Prisma client                                 |
+| `npm run prisma:migrate`                   | Prisma migrate command (mostly for SQL setups)         |
+| `npm run prisma:studio`                    | Open Prisma Studio                                     |
+| `npm run prisma:seed`                      | Seed default users                                     |
+| `npm test`                                 | Run tests in-band                                      |
+| `npm run test:watch`                       | Run tests in watch mode                                |
+| `npm run test:coverage`                    | Generate coverage report                               |
 
 ---
 
@@ -417,17 +419,41 @@ curl -X POST http://localhost:8000/api/v1/auth/refresh-token \
 
 ## How to Add a New Module
 
-Follow this exact pattern for consistency.
+Use the generator script (recommended):
 
-1. Create folder: `src/app/modules/Book`
-2. Add `book.interface.ts` (types/interfaces)
-3. Add `book.validation.ts` (Zod request schemas)
-4. Add `book.service.ts` (business logic + Prisma operations)
-5. Add `book.controller.ts` (HTTP handling + `sendResponse`)
-6. Add `book.route.ts` (routes + validation + auth middleware)
-7. Register in `src/app/routes/index.ts`
-8. (Optional) Extend Swagger definitions in `src/lib/swagger.ts`
-9. Add tests under `src/__tests__/`
+```bash
+npm run module:create -- Book
+```
+
+This command creates:
+
+1. `src/app/modules/Book/book.interface.ts`
+2. `src/app/modules/Book/book.validation.ts`
+3. `src/app/modules/Book/book.service.ts`
+4. `src/app/modules/Book/book.controller.ts`
+5. `src/app/modules/Book/book.route.ts`
+6. Route registration in `src/app/routes/index.ts` as `/book`
+
+More options:
+
+```bash
+# create module files but do not auto-register route
+npm run module:create:no-route -- Product
+
+# same behavior as module:create with explicit flag
+npm run module:create -- Product --no-route
+
+# overwrite existing generated files
+npm run module:create -- Product --force
+```
+
+After generation:
+
+1. Implement business logic in `*.service.ts`
+2. Adjust validation schema in `*.validation.ts`
+3. Update route auth/access rules in `*.route.ts`
+4. (Optional) Extend Swagger definitions in `src/lib/swagger.ts`
+5. Add tests under `src/__tests__/`
 
 Recommended rule: **controller thin, service heavy**.
 
