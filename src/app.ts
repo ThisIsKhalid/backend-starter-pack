@@ -2,6 +2,7 @@ import cors from "cors";
 import express, { Application, NextFunction, Request, Response } from "express";
 import helmet from "helmet";
 import responseTime from "response-time";
+import GlobalErrorHandler from "./app/middlewares/globalErrorHandler";
 import router from "./app/routes";
 import config from "./config";
 import logger from "./utils/logger/logger";
@@ -52,14 +53,14 @@ app.use(
       time < 100
         ? "VERY FAST"
         : time < 200
-        ? "FAST"
-        : time < 500
-        ? "NORMAL"
-        : time < 1000
-        ? "SLOW"
-        : time < 5000
-        ? "VERY_SLOW"
-        : "CRITICAL";
+          ? "FAST"
+          : time < 500
+            ? "NORMAL"
+            : time < 1000
+              ? "SLOW"
+              : time < 5000
+                ? "VERY_SLOW"
+                : "CRITICAL";
 
     // Skip logging for streaming requests to reduce noise
     if (!req.path.includes("/stream/")) {
@@ -84,7 +85,7 @@ app.use(
         alert: "SLOW_RESPONSE",
       });
     }
-  })
+  }),
 );
 
 // Routes
@@ -111,6 +112,9 @@ app.get("/api/v1/health", async (req: Request, res: Response) => {
     });
   }
 });
+
+// Error handling middleware
+app.use(GlobalErrorHandler);
 
 // 404 Not Found handler
 app.use((req: Request, res: Response, next: NextFunction) => {
