@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { IGenericErrorMessage } from "../interfaces/common";
 

@@ -1,4 +1,11 @@
-export const fileFilter = (req: any, file: any, cb: any) => {
+import { Request } from "express";
+import multer from "multer";
+
+export const fileFilter = (
+  req: Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+) => {
   const allowedMimeTypes = [
     "image/jpeg",
     "image/png",
@@ -18,11 +25,6 @@ export const fileFilter = (req: any, file: any, cb: any) => {
   if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(
-      new Error(
-        `Invalid file type. Only ${allowedMimeTypes.join(", ")} are allowed`
-      ),
-      false
-    );
+    cb(new Error(`Invalid file type. Only ${allowedMimeTypes.join(", ")} are allowed`), false);
   }
 };
