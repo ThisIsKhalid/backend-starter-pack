@@ -16,10 +16,12 @@ if (missingVars.length > 0) {
 const config = {
   env: process.env.NODE_ENV || "development",
   port: Number(process.env.PORT) || 8000,
+  host: process.env.HOST || "0.0.0.0",
   app: {
     name: process.env.APP_NAME || "Backend Starter Pack",
     version: process.env.APP_VERSION || "1.0.0",
     frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
+    backendUrl: process.env.BACKEND_URL || "http://localhost:8000",
   },
   password_salt: Number(process.env.PASSWORD_SALT) || 12,
   jwt: {

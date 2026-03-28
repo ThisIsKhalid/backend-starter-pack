@@ -16,8 +16,8 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: `http://localhost:${config.port}/api/v1`,
-        description: "Local Development",
+        url: "/api/v1",
+        description: "Current host",
       },
     ],
     components: {
@@ -266,10 +266,10 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
-      "/auth/reset-password": {
+      "/auth/verify-otp": {
         post: {
           tags: ["Auth"],
-          summary: "Reset password with OTP",
+          summary: "Verify password reset OTP and receive reset token",
           security: [],
           requestBody: {
             required: true,
@@ -277,10 +277,37 @@ const options: swaggerJsdoc.Options = {
               "application/json": {
                 schema: {
                   type: "object",
-                  required: ["email", "otp", "newPassword"],
+                  required: ["email", "otp"],
                   properties: {
                     email: { type: "string", format: "email" },
                     otp: { type: "string", example: "123456" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: "OTP verified and reset token issued",
+            },
+            400: { description: "Invalid or expired OTP" },
+          },
+        },
+      },
+      "/auth/reset-password": {
+        post: {
+          tags: ["Auth"],
+          summary: "Reset password with reset token",
+          security: [],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["resetToken", "newPassword"],
+                  properties: {
+                    resetToken: { type: "string" },
                     newPassword: { type: "string", minLength: 6 },
                   },
                 },
@@ -289,7 +316,7 @@ const options: swaggerJsdoc.Options = {
           },
           responses: {
             200: { description: "Password reset successfully" },
-            400: { description: "Invalid or expired OTP" },
+            401: { description: "Invalid or expired reset token" },
           },
         },
       },

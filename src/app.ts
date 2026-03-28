@@ -40,7 +40,16 @@ app.use(hpp());
 // Body Parsers
 // ---------------------------------------------------------------------------
 
-app.use(express.json({ limit: "10mb" }));
+type RawBodyRequest = Request & { rawBody?: Buffer };
+
+app.use(
+  express.json({
+    limit: "10mb",
+    verify: (req, _res, buf) => {
+      (req as RawBodyRequest).rawBody = buf;
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(express.static("public"));
 

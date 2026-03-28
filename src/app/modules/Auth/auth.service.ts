@@ -9,7 +9,7 @@ import { otpEmail } from "../../../shared/emails/otpEmail";
 import { passwordResetEmail } from "../../../shared/emails/passwordResetEmail";
 import { generateOTP } from "../../../utils/generateOtp";
 import { compareItem, hashItem } from "../../../utils/hashAndCompareItem";
-import { jwtHelpers } from "../../../utils/jwtHelpers";
+import { ITokenPayload, jwtHelpers } from "../../../utils/jwtHelpers";
 import {
   IChangePasswordInput,
   IForgotPasswordInput,
@@ -17,9 +17,9 @@ import {
   IRefreshTokenInput,
   IResendOtpInput,
   IResetPasswordInput,
-  ITokenPayload,
   IUser,
   IVerifyEmailInput,
+  IVerifyOtpInput,
 } from "./auth.interface";
 
 const OTP_EXPIRY_MINUTES = 10;
@@ -27,16 +27,6 @@ const OTP_EXPIRY_MINUTES = 10;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const generateAuthTokens = (payload: ITokenPayload) => {
-  const accessToken = jwtHelpers.generateToken(payload, config.jwt.secret, config.jwt.expiresIn);
-  const refreshToken = jwtHelpers.generateToken(
-    payload,
-    config.jwt.refreshSecret,
-    config.jwt.refreshExpiresIn
-  );
-  return { accessToken, refreshToken };
-};
 
 const saveRefreshToken = async (userId: string, token: string) => {
   const expiresAt = new Date();
@@ -120,7 +110,7 @@ const login = async (loginData: ILoginInput) => {
     role: user.role,
   };
 
-  const { accessToken, refreshToken } = generateAuthTokens(payload);
+  const { accessToken, refreshToken } = jwtHelpers.generateAuthTokens(payload);
 
   await saveRefreshToken(user.id, refreshToken);
 
@@ -176,7 +166,7 @@ const refreshAccessToken = async ({ refreshToken }: IRefreshTokenInput) => {
   }
 
   const payload: ITokenPayload = { id: user.id, email: user.email, role: user.role };
-  const { accessToken, refreshToken: newRefreshToken } = generateAuthTokens(payload);
+  const { accessToken, refreshToken: newRefreshToken } = jwtHelpers.generateAuthTokens(payload);
 
   // Rotate refresh token: delete old, save new
   await prisma.refreshToken.delete({ where: { token: refreshToken } });
@@ -260,7 +250,7 @@ const forgotPassword = async ({ email }: IForgotPasswordInput) => {
   await createAndSendOtp(email, OtpPurpose.PASSWORD_RESET, user.id);
 };
 
-const resetPassword = async ({ email, otp, newPassword }: IResetPasswordInput) => {
+const verifyOtp = async ({ email, otp }: IVerifyOtpInput) => {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found.");
@@ -280,16 +270,35 @@ const resetPassword = async ({ email, otp, newPassword }: IResetPasswordInput) =
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid or expired OTP.");
   }
 
+  await prisma.otpToken.update({
+    where: { id: otpRecord.id },
+    data: { used: true },
+  });
+
+  const resetToken = jwtHelpers.generateToken({ email: user.email }, config.jwt.secret, "10m");
+
+  return { resetToken };
+};
+
+const resetPassword = async ({ resetToken, newPassword }: IResetPasswordInput) => {
+  let decoded: { email: string };
+  try {
+    decoded = jwtHelpers.verifyToken(resetToken, config.jwt.secret) as { email: string };
+  } catch {
+    throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid or expired reset token.");
+  }
+
+  const user = await prisma.user.findUnique({ where: { email: decoded.email } });
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found.");
+  }
+
   const hashedPassword = await hashItem(newPassword);
 
   await prisma.$transaction([
     prisma.user.update({
       where: { id: user.id },
       data: { password: hashedPassword },
-    }),
-    prisma.otpToken.update({
-      where: { id: otpRecord.id },
-      data: { used: true },
     }),
     // Revoke all refresh tokens on password reset
     prisma.refreshToken.deleteMany({ where: { userId: user.id } }),
@@ -346,6 +355,7 @@ export const AuthService = {
   verifyEmail,
   resendOtp,
   forgotPassword,
+  verifyOtp,
   resetPassword,
   changePassword,
   getMe,

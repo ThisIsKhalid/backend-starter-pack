@@ -1,5 +1,3 @@
-import { Role } from "@prisma/client";
-
 export interface IUser {
   email: string;
   password: string;
@@ -11,12 +9,6 @@ export interface ILoginInput {
   password: string;
 }
 
-export interface ITokenPayload {
-  id: string;
-  email: string;
-  role: Role;
-}
-
 export interface IRefreshTokenInput {
   refreshToken: string;
 }
@@ -25,9 +17,13 @@ export interface IForgotPasswordInput {
   email: string;
 }
 
-export interface IResetPasswordInput {
+export interface IVerifyOtpInput {
   email: string;
   otp: string;
+}
+
+export interface IResetPasswordInput {
+  resetToken: string;
   newPassword: string;
 }
 

@@ -225,9 +225,11 @@ Copy from `.env.example` and update as needed.
 | ------------------------ | -------- | ----------------------- | -------------------------------------------- |
 | `NODE_ENV`               | No       | `development`           | App environment (`development`/`production`) |
 | `PORT`                   | No       | `8000`                  | Server port                                  |
+| `HOST`                   | No       | `0.0.0.0`               | Server bind host                             |
 | `APP_NAME`               | No       | `Backend Starter Pack`  | Display name in root/Swagger                 |
 | `APP_VERSION`            | No       | `1.0.0`                 | Version metadata                             |
 | `FRONTEND_URL`           | No       | `http://localhost:3000` | Frontend reference URL                       |
+| `BACKEND_URL`            | No       | `http://localhost:8000` | Backend reference URL                        |
 | `DATABASE_URL`           | **Yes**  | —                       | MongoDB connection string                    |
 | `JWT_SECRET`             | **Yes**  | —                       | Access token secret                          |
 | `JWT_REFRESH_SECRET`     | **Yes**  | —                       | Refresh token secret                         |
@@ -310,7 +312,8 @@ Auth routes are mounted under:
 | `POST` | `/verify-email`    | No        | Verify email using OTP                             |
 | `POST` | `/resend-otp`      | No        | Resend OTP for email verification/password reset   |
 | `POST` | `/forgot-password` | No        | Send password reset OTP (no user-enumeration leak) |
-| `POST` | `/reset-password`  | No        | Reset password using OTP                           |
+| `POST` | `/verify-otp`      | No        | Verify reset OTP and receive a short-lived token   |
+| `POST` | `/reset-password`  | No        | Reset password using reset token                   |
 | `POST` | `/change-password` | Yes       | Change password with old password                  |
 | `GET`  | `/me`              | Yes       | Get current profile                                |
 
@@ -318,7 +321,8 @@ Auth routes are mounted under:
 
 - OTP validity is **10 minutes**
 - Old unused OTPs for same purpose are invalidated when a new OTP is created
-- Reset password marks OTP used and revokes all refresh tokens
+- Password reset flow is two-step: verify OTP first, then reset with short-lived token
+- Reset password revokes all refresh tokens
 
 ### Typical auth flow (recommended)
 
@@ -328,6 +332,12 @@ Auth routes are mounted under:
 4. Use access token for protected routes
 5. Refresh token when access token expires
 6. Logout to invalidate token
+
+### Password reset flow
+
+1. Call `POST /forgot-password` with email
+2. Call `POST /verify-otp` with email + OTP to receive `resetToken`
+3. Call `POST /reset-password` with `resetToken` + `newPassword`
 
 ### Example requests
 

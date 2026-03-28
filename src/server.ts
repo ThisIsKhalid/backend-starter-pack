@@ -17,8 +17,8 @@ async function main() {
     await redis.connect();
 
     // 3. Start HTTP server
-    server = app.listen(config.port, () => {
-      logger.info(`🚀 Server running on port ${config.port} [${config.env}]`);
+    server = app.listen(config.port, config.host, () => {
+      logger.info(`🚀 Server running on ${config.host}:${config.port} [${config.env}]`);
       logger.info(`📄 API docs: http://localhost:${config.port}/api/docs`);
     });
 
