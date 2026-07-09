@@ -11,6 +11,8 @@ export interface ILoginInput {
 
 export interface IRefreshTokenInput {
   refreshToken: string;
+  userAgent?: string;
+  ip?: string;
 }
 
 export interface IForgotPasswordInput {

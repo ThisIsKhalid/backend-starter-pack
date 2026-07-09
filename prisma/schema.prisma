@@ -38,7 +38,7 @@ model User {
 model OtpToken {
   id        String     @id @default(auto()) @map("_id") @db.ObjectId
   userId    String     @db.ObjectId
-  otp       String
+  otpHash   String
   purpose   OtpPurpose
   expiresAt DateTime
   used      Boolean    @default(false)
@@ -50,15 +50,22 @@ model OtpToken {
 }
 
 model RefreshToken {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   @db.ObjectId
-  token     String   @unique
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String    @db.ObjectId
+  tokenHash String    @unique
+  jti       String
+  familyId  String
   expiresAt DateTime
-  createdAt DateTime @default(now())
+  revokedAt DateTime?
+  userAgent String?
+  ip        String?
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([jti])
+  @@index([familyId])
 }
 
 model Post {

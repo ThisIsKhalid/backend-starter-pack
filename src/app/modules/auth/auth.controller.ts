@@ -15,7 +15,10 @@ const register = catchAsync(async (req: Request, res: Response) => {
 });
 
 const login = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthService.login(req.body);
+  const result = await AuthService.login(req.body, {
+    userAgent: req.headers["user-agent"],
+    ip: req.ip,
+  });
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
@@ -25,7 +28,11 @@ const login = catchAsync(async (req: Request, res: Response) => {
 });
 
 const refreshToken = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthService.refreshAccessToken(req.body);
+  const result = await AuthService.refreshAccessToken({
+    ...req.body,
+    userAgent: req.headers["user-agent"],
+    ip: req.ip,
+  });
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,

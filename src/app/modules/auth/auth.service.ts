@@ -1,4 +1,5 @@
 import { OtpPurpose } from "@prisma/client";
+import crypto from "crypto";
 import httpStatus from "http-status";
 import config from "../../../config";
 import ApiError from "../../../errors/apiError";
@@ -8,7 +9,13 @@ import { blacklistToken, isTokenBlacklisted } from "../../../lib/redisConnection
 import { otpEmail } from "../../../shared/emails/otpEmail";
 import { passwordResetEmail } from "../../../shared/emails/passwordResetEmail";
 import { generateOTP } from "../../../utils/generateOtp";
-import { compareItem, hashItem } from "../../../utils/hashAndCompareItem";
+import {
+  compareItem,
+  compareOtp,
+  hashItem,
+  hashOtp,
+  hashToken,
+} from "../../../utils/hashAndCompareItem";
 import { ITokenPayload, jwtHelpers } from "../../../utils/jwtHelpers";
 import {
   IChangePasswordInput,
@@ -28,11 +35,30 @@ const OTP_EXPIRY_MINUTES = 10;
 // Helpers
 // ---------------------------------------------------------------------------
 
-const saveRefreshToken = async (userId: string, token: string) => {
+interface RefreshTokenMeta {
+  userAgent?: string;
+  ip?: string;
+  familyId?: string;
+}
+
+const saveRefreshToken = async (userId: string, token: string, meta: RefreshTokenMeta = {}) => {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+
+  const tokenHash = hashToken(token);
+  const jti = crypto.randomUUID();
+  const familyId = meta.familyId ?? crypto.randomUUID();
+
   await prisma.refreshToken.create({
-    data: { userId, token, expiresAt },
+    data: {
+      userId,
+      tokenHash,
+      jti,
+      familyId,
+      expiresAt,
+      userAgent: meta.userAgent,
+      ip: meta.ip,
+    },
   });
 };
 
@@ -44,10 +70,11 @@ const createAndSendOtp = async (email: string, purpose: OtpPurpose, userId: stri
   });
 
   const otp = generateOTP();
+  const otpHash = hashOtp(otp);
   const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
   await prisma.otpToken.create({
-    data: { userId, otp, purpose, expiresAt },
+    data: { userId, otpHash, purpose, expiresAt },
   });
 
   if (purpose === OtpPurpose.EMAIL_VERIFICATION) {
@@ -86,7 +113,7 @@ const register = async (userData: IUser) => {
   return user;
 };
 
-const login = async (loginData: ILoginInput) => {
+const login = async (loginData: ILoginInput, meta: RefreshTokenMeta = {}) => {
   const user = await prisma.user.findUnique({
     where: { email: loginData.email },
   });
@@ -112,7 +139,10 @@ const login = async (loginData: ILoginInput) => {
 
   const { accessToken, refreshToken } = jwtHelpers.generateAuthTokens(payload);
 
-  await saveRefreshToken(user.id, refreshToken);
+  await saveRefreshToken(user.id, refreshToken, {
+    userAgent: meta.userAgent,
+    ip: meta.ip,
+  });
 
   // Update last login
   await prisma.user.update({
@@ -133,27 +163,41 @@ const login = async (loginData: ILoginInput) => {
   };
 };
 
-const refreshAccessToken = async ({ refreshToken }: IRefreshTokenInput) => {
+const refreshAccessToken = async ({ refreshToken, userAgent, ip }: IRefreshTokenInput) => {
+  const tokenHash = hashToken(refreshToken);
+
   // Check blacklist
   const blacklisted = await isTokenBlacklisted(refreshToken);
   if (blacklisted) {
     throw new ApiError(httpStatus.UNAUTHORIZED, "Refresh token has been revoked.");
   }
 
-  let decoded: ITokenPayload;
+  let decoded: ITokenPayload & { jti?: string };
   try {
-    decoded = jwtHelpers.verifyToken(refreshToken, config.jwt.refreshSecret) as ITokenPayload;
+    decoded = jwtHelpers.verifyToken(refreshToken, config.jwt.refreshSecret) as ITokenPayload & {
+      jti?: string;
+    };
   } catch {
     throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid or expired refresh token.");
   }
 
-  // Verify token exists in DB
+  // Verify token exists in DB (lookup by hash)
   const storedToken = await prisma.refreshToken.findUnique({
-    where: { token: refreshToken },
+    where: { tokenHash },
   });
 
   if (!storedToken || storedToken.expiresAt < new Date()) {
     throw new ApiError(httpStatus.UNAUTHORIZED, "Refresh token not found or expired.");
+  }
+
+  // Detect token reuse — if already revoked, the family is compromised
+  if (storedToken.revokedAt) {
+    // Revoke entire family
+    await prisma.refreshToken.updateMany({
+      where: { familyId: storedToken.familyId },
+      data: { revokedAt: new Date() },
+    });
+    throw new ApiError(httpStatus.UNAUTHORIZED, "Token reuse detected. All sessions revoked.");
   }
 
   const user = await prisma.user.findUnique({
@@ -168,9 +212,16 @@ const refreshAccessToken = async ({ refreshToken }: IRefreshTokenInput) => {
   const payload: ITokenPayload = { id: user.id, email: user.email, role: user.role };
   const { accessToken, refreshToken: newRefreshToken } = jwtHelpers.generateAuthTokens(payload);
 
-  // Rotate refresh token: delete old, save new
-  await prisma.refreshToken.delete({ where: { token: refreshToken } });
-  await saveRefreshToken(user.id, newRefreshToken);
+  // Rotate refresh token: revoke old, save new (same family)
+  await prisma.refreshToken.update({
+    where: { tokenHash },
+    data: { revokedAt: new Date() },
+  });
+  await saveRefreshToken(user.id, newRefreshToken, {
+    familyId: storedToken.familyId,
+    userAgent,
+    ip,
+  });
 
   return { accessToken, refreshToken: newRefreshToken };
 };
@@ -190,7 +241,8 @@ const logout = async (accessToken: string, refreshToken?: string) => {
 
   // Remove refresh token from DB
   if (refreshToken) {
-    await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
+    const tokenHash = hashToken(refreshToken);
+    await prisma.refreshToken.deleteMany({ where: { tokenHash } });
   }
 };
 
@@ -203,15 +255,23 @@ const verifyEmail = async ({ email, otp }: IVerifyEmailInput) => {
     throw new ApiError(httpStatus.BAD_REQUEST, "Email is already verified.");
   }
 
-  const otpRecord = await prisma.otpToken.findFirst({
+  const otpRecords = await prisma.otpToken.findMany({
     where: {
       userId: user.id,
-      otp,
       purpose: OtpPurpose.EMAIL_VERIFICATION,
       used: false,
       expiresAt: { gt: new Date() },
     },
   });
+
+  // Compare OTP against stored hashes
+  let otpRecord: (typeof otpRecords)[number] | null = null;
+  for (const record of otpRecords) {
+    if (compareOtp(otp, record.otpHash)) {
+      otpRecord = record;
+      break;
+    }
+  }
 
   if (!otpRecord) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid or expired OTP.");
@@ -256,15 +316,23 @@ const verifyOtp = async ({ email, otp }: IVerifyOtpInput) => {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found.");
   }
 
-  const otpRecord = await prisma.otpToken.findFirst({
+  const otpRecords = await prisma.otpToken.findMany({
     where: {
       userId: user.id,
-      otp,
       purpose: OtpPurpose.PASSWORD_RESET,
       used: false,
       expiresAt: { gt: new Date() },
     },
   });
+
+  // Compare OTP against stored hashes
+  let otpRecord: (typeof otpRecords)[number] | null = null;
+  for (const record of otpRecords) {
+    if (compareOtp(otp, record.otpHash)) {
+      otpRecord = record;
+      break;
+    }
+  }
 
   if (!otpRecord) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid or expired OTP.");
