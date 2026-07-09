@@ -22,7 +22,6 @@ uploads/
 Thumbs.db
 
 # IDE
-.vscode/settings.json
 .idea/
 
 # Testing
@@ -34,3 +33,7 @@ coverage/
 # TypeScript
 *.tsbuildinfo
 
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+.gitignore
