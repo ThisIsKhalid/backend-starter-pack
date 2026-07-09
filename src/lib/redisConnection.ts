@@ -55,6 +55,29 @@ export const isTokenBlacklisted = async (token: string): Promise<boolean> => {
 };
 
 // ---------------------------------------------------------------------------
+// Distributed lock (used for atomic refresh-token rotation)
+// ---------------------------------------------------------------------------
+
+const LOCK_PREFIX = "lock:";
+const LOCK_TTL_MS = 5000; // 5-second safety net to auto-release stale locks
+
+/**
+ * Acquire a short-lived Redis lock for `tokenHash`.
+ * Returns true if the lock was acquired, false if another holder has it.
+ */
+export const acquireLock = async (tokenHash: string): Promise<boolean> => {
+  const key = `${LOCK_PREFIX}${tokenHash}`;
+  const result = await redis.set(key, "1", "PX", LOCK_TTL_MS, "NX");
+  return result === "OK";
+};
+
+/** Release a previously acquired lock (only if we still own it). */
+export const releaseLock = async (tokenHash: string): Promise<void> => {
+  const key = `${LOCK_PREFIX}${tokenHash}`;
+  await redis.del(key);
+};
+
+// ---------------------------------------------------------------------------
 // OTP rate-limiting helpers
 // ---------------------------------------------------------------------------
 

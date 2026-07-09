@@ -6,6 +6,7 @@ import ApiError from "../../../errors/apiError";
 import emailSender from "../../../helpers/email_sender/emailSender";
 import prisma from "../../../lib/prisma";
 import {
+  acquireLock,
   blacklistToken,
   consumeResetToken,
   incrementOtpAttempts,
@@ -14,6 +15,7 @@ import {
   isTokenBlacklisted,
   OTP_IP_MAX,
   OTP_MAX_ATTEMPTS,
+  releaseLock,
   resetOtpAttempts,
   setOtpCooldown,
   storeResetToken,
@@ -178,12 +180,16 @@ const login = async (loginData: ILoginInput, meta: RefreshTokenMeta = {}) => {
 const refreshAccessToken = async ({ refreshToken, userAgent, ip }: IRefreshTokenInput) => {
   const tokenHash = hashToken(refreshToken);
 
-  // Check blacklist
-  const blacklisted = await isTokenBlacklisted(refreshToken);
-  if (blacklisted) {
+  // ------------------------------------------------------------------
+  // 1. Early exit: blacklist check (fast-fail for logged-out tokens)
+  // ------------------------------------------------------------------
+  if (await isTokenBlacklisted(refreshToken)) {
     throw new ApiError(httpStatus.UNAUTHORIZED, "Refresh token has been revoked.");
   }
 
+  // ------------------------------------------------------------------
+  // 2. Verify JWT signature + claims
+  // ------------------------------------------------------------------
   let decoded: ITokenPayload & { jti?: string };
   try {
     decoded = jwtHelpers.verifyToken(refreshToken, config.jwt.refreshSecret) as ITokenPayload & {
@@ -193,49 +199,91 @@ const refreshAccessToken = async ({ refreshToken, userAgent, ip }: IRefreshToken
     throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid or expired refresh token.");
   }
 
-  // Verify token exists in DB (lookup by hash)
-  const storedToken = await prisma.refreshToken.findUnique({
-    where: { tokenHash },
-  });
-
-  if (!storedToken || storedToken.expiresAt < new Date()) {
-    throw new ApiError(httpStatus.UNAUTHORIZED, "Refresh token not found or expired.");
+  // ------------------------------------------------------------------
+  // 3. Acquire per-token distributed lock (serialise concurrent rotations)
+  // ------------------------------------------------------------------
+  const locked = await acquireLock(tokenHash);
+  if (!locked) {
+    throw new ApiError(
+      httpStatus.CONFLICT,
+      "Token is being refreshed by another request. Please retry."
+    );
   }
 
-  // Detect token reuse — if already revoked, the family is compromised
-  if (storedToken.revokedAt) {
-    // Revoke entire family
-    await prisma.refreshToken.updateMany({
-      where: { familyId: storedToken.familyId },
+  try {
+    // ----------------------------------------------------------------
+    // 4. Look up token in DB
+    // ----------------------------------------------------------------
+    const storedToken = await prisma.refreshToken.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!storedToken || storedToken.expiresAt < new Date()) {
+      throw new ApiError(httpStatus.UNAUTHORIZED, "Refresh token not found or expired.");
+    }
+
+    // ----------------------------------------------------------------
+    // 5. Reuse detection — if already revoked, the family is compromised
+    // ----------------------------------------------------------------
+    if (storedToken.revokedAt) {
+      // Poison the token in Redis so any in-flight request also fails
+      await blacklistToken(refreshToken, 7 * 24 * 60 * 60);
+      // Revoke the entire family
+      await prisma.refreshToken.updateMany({
+        where: { familyId: storedToken.familyId },
+        data: { revokedAt: new Date() },
+      });
+      throw new ApiError(httpStatus.UNAUTHORIZED, "Token reuse detected. All sessions revoked.");
+    }
+
+    // ----------------------------------------------------------------
+    // 6. Atomically revoke the old token (conditional update)
+    //    If count === 0, another request rotated it first → revoke family.
+    // ----------------------------------------------------------------
+    const { count: revokedCount } = await prisma.refreshToken.updateMany({
+      where: { tokenHash, revokedAt: null },
       data: { revokedAt: new Date() },
     });
-    throw new ApiError(httpStatus.UNAUTHORIZED, "Token reuse detected. All sessions revoked.");
+
+    if (revokedCount === 0) {
+      await blacklistToken(refreshToken, 7 * 24 * 60 * 60);
+      await prisma.refreshToken.updateMany({
+        where: { familyId: storedToken.familyId },
+        data: { revokedAt: new Date() },
+      });
+      throw new ApiError(httpStatus.UNAUTHORIZED, "Token reuse detected. All sessions revoked.");
+    }
+
+    // ----------------------------------------------------------------
+    // 7. Blacklist old token (blocks any in-flight concurrent request)
+    // ----------------------------------------------------------------
+    await blacklistToken(refreshToken, 7 * 24 * 60 * 60);
+
+    // ----------------------------------------------------------------
+    // 8. Issue new token pair (same family)
+    // ----------------------------------------------------------------
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: { id: true, email: true, role: true, isActive: true },
+    });
+
+    if (!user || !user.isActive) {
+      throw new ApiError(httpStatus.UNAUTHORIZED, "User not found or account deactivated.");
+    }
+
+    const payload: ITokenPayload = { id: user.id, email: user.email, role: user.role };
+    const { accessToken, refreshToken: newRefreshToken } = jwtHelpers.generateAuthTokens(payload);
+
+    await saveRefreshToken(user.id, newRefreshToken, {
+      familyId: storedToken.familyId,
+      userAgent,
+      ip,
+    });
+
+    return { accessToken, refreshToken: newRefreshToken };
+  } finally {
+    await releaseLock(tokenHash);
   }
-
-  const user = await prisma.user.findUnique({
-    where: { id: decoded.id },
-    select: { id: true, email: true, role: true, isActive: true },
-  });
-
-  if (!user || !user.isActive) {
-    throw new ApiError(httpStatus.UNAUTHORIZED, "User not found or account deactivated.");
-  }
-
-  const payload: ITokenPayload = { id: user.id, email: user.email, role: user.role };
-  const { accessToken, refreshToken: newRefreshToken } = jwtHelpers.generateAuthTokens(payload);
-
-  // Rotate refresh token: revoke old, save new (same family)
-  await prisma.refreshToken.update({
-    where: { tokenHash },
-    data: { revokedAt: new Date() },
-  });
-  await saveRefreshToken(user.id, newRefreshToken, {
-    familyId: storedToken.familyId,
-    userAgent,
-    ip,
-  });
-
-  return { accessToken, refreshToken: newRefreshToken };
 };
 
 const logout = async (accessToken: string, refreshToken?: string) => {
