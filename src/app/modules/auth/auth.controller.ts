@@ -54,7 +54,7 @@ const logout = catchAsync(async (req: Request, res: Response) => {
 });
 
 const verifyEmail = catchAsync(async (req: Request, res: Response) => {
-  await AuthService.verifyEmail(req.body);
+  await AuthService.verifyEmail({ ...req.body, ip: req.ip });
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
@@ -85,7 +85,7 @@ const forgotPassword = catchAsync(async (req: Request, res: Response) => {
 });
 
 const verifyOtp = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthService.verifyOtp(req.body);
+  const result = await AuthService.verifyOtp({ ...req.body, ip: req.ip });
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,

@@ -5,7 +5,17 @@ import config from "../../../config";
 import ApiError from "../../../errors/apiError";
 import emailSender from "../../../helpers/email_sender/emailSender";
 import prisma from "../../../lib/prisma";
-import { blacklistToken, isTokenBlacklisted } from "../../../lib/redisConnection";
+import {
+  blacklistToken,
+  incrementOtpAttempts,
+  incrementOtpIpAttempts,
+  isOtpOnCooldown,
+  isTokenBlacklisted,
+  OTP_IP_MAX,
+  OTP_MAX_ATTEMPTS,
+  resetOtpAttempts,
+  setOtpCooldown,
+} from "../../../lib/redisConnection";
 import { otpEmail } from "../../../shared/emails/otpEmail";
 import { passwordResetEmail } from "../../../shared/emails/passwordResetEmail";
 import { generateOTP } from "../../../utils/generateOtp";
@@ -246,13 +256,27 @@ const logout = async (accessToken: string, refreshToken?: string) => {
   }
 };
 
-const verifyEmail = async ({ email, otp }: IVerifyEmailInput) => {
+const verifyEmail = async ({ email, otp, ip }: IVerifyEmailInput & { ip?: string }) => {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found.");
   }
   if (user.isEmailVerified) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Email is already verified.");
+  }
+
+  // --- Rate-limit checks ---
+  if (await isOtpOnCooldown(user.id, OtpPurpose.EMAIL_VERIFICATION)) {
+    throw new ApiError(
+      httpStatus.TOO_MANY_REQUESTS,
+      "Too many failed attempts. Please wait 15 minutes or request a new OTP."
+    );
+  }
+  if (ip && (await incrementOtpIpAttempts(ip)) > OTP_IP_MAX) {
+    throw new ApiError(
+      httpStatus.TOO_MANY_REQUESTS,
+      "Too many OTP attempts from this IP. Please try again later."
+    );
   }
 
   const otpRecords = await prisma.otpToken.findMany({
@@ -274,8 +298,19 @@ const verifyEmail = async ({ email, otp }: IVerifyEmailInput) => {
   }
 
   if (!otpRecord) {
+    const attempts = await incrementOtpAttempts(user.id, OtpPurpose.EMAIL_VERIFICATION);
+    if (attempts >= OTP_MAX_ATTEMPTS) {
+      await setOtpCooldown(user.id, OtpPurpose.EMAIL_VERIFICATION);
+      throw new ApiError(
+        httpStatus.TOO_MANY_REQUESTS,
+        "Too many failed attempts. Please wait 15 minutes or request a new OTP."
+      );
+    }
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid or expired OTP.");
   }
+
+  // Success — reset counters
+  await resetOtpAttempts(user.id, OtpPurpose.EMAIL_VERIFICATION);
 
   await prisma.$transaction([
     prisma.user.update({
@@ -310,10 +345,24 @@ const forgotPassword = async ({ email }: IForgotPasswordInput) => {
   await createAndSendOtp(email, OtpPurpose.PASSWORD_RESET, user.id);
 };
 
-const verifyOtp = async ({ email, otp }: IVerifyOtpInput) => {
+const verifyOtp = async ({ email, otp, ip }: IVerifyOtpInput & { ip?: string }) => {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found.");
+  }
+
+  // --- Rate-limit checks ---
+  if (await isOtpOnCooldown(user.id, OtpPurpose.PASSWORD_RESET)) {
+    throw new ApiError(
+      httpStatus.TOO_MANY_REQUESTS,
+      "Too many failed attempts. Please wait 15 minutes or request a new OTP."
+    );
+  }
+  if (ip && (await incrementOtpIpAttempts(ip)) > OTP_IP_MAX) {
+    throw new ApiError(
+      httpStatus.TOO_MANY_REQUESTS,
+      "Too many OTP attempts from this IP. Please try again later."
+    );
   }
 
   const otpRecords = await prisma.otpToken.findMany({
@@ -335,8 +384,19 @@ const verifyOtp = async ({ email, otp }: IVerifyOtpInput) => {
   }
 
   if (!otpRecord) {
+    const attempts = await incrementOtpAttempts(user.id, OtpPurpose.PASSWORD_RESET);
+    if (attempts >= OTP_MAX_ATTEMPTS) {
+      await setOtpCooldown(user.id, OtpPurpose.PASSWORD_RESET);
+      throw new ApiError(
+        httpStatus.TOO_MANY_REQUESTS,
+        "Too many failed attempts. Please wait 15 minutes or request a new OTP."
+      );
+    }
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid or expired OTP.");
   }
+
+  // Success — reset counters
+  await resetOtpAttempts(user.id, OtpPurpose.PASSWORD_RESET);
 
   await prisma.otpToken.update({
     where: { id: otpRecord.id },
