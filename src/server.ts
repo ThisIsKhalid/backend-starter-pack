@@ -1,6 +1,7 @@
 import { Server } from "http";
 import app from "./app";
 import config from "./config";
+import { startEmailWorker, stopEmailWorker } from "./helpers/email_sender/emailWorker";
 import prisma from "./lib/prisma";
 import redis from "./lib/redisConnection";
 import logger from "./utils/logger/logger";
@@ -16,7 +17,10 @@ async function main() {
     // 2. Connect to Redis
     await redis.connect();
 
-    // 3. Start HTTP server
+    // 3. Start email delivery worker
+    startEmailWorker();
+
+    // 4. Start HTTP server
     server = app.listen(config.port, config.host, () => {
       logger.info(`🚀 Server running on ${config.host}:${config.port} [${config.env}]`);
       logger.info(`📄 API docs: http://localhost:${config.port}/api/docs`);
@@ -48,6 +52,9 @@ const gracefulShutdown = async (signal: string) => {
   if (server) {
     server.close(async () => {
       logger.info("HTTP server closed.");
+
+      stopEmailWorker();
+      logger.info("Email worker stopped.");
 
       try {
         await prisma.$disconnect();

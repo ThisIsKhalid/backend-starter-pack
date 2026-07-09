@@ -68,6 +68,28 @@ model RefreshToken {
   @@index([familyId])
 }
 
+enum EmailJobStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
+model EmailJob {
+  id          String         @id @default(auto()) @map("_id") @db.ObjectId
+  to          String
+  subject     String
+  html        String
+  status      EmailJobStatus @default(PENDING)
+  attempts    Int            @default(0)
+  maxAttempts Int            @default(3)
+  lastError   String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([status])
+}
+
 model Post {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   title     String
