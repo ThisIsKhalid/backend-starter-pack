@@ -3,6 +3,7 @@ import express, { Application, NextFunction, Request, Response } from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import hpp from "hpp";
+import path from "path";
 import responseTime from "response-time";
 import GlobalErrorHandler from "./app/middlewares/globalErrorHandler";
 import router from "./app/routes";
@@ -52,6 +53,9 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(express.static("public"));
+
+// app.use("/uploads", express.static(path.join("/var/www/uploads")));
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads"))); // Serve static files from the "uploads" directory
 
 // ---------------------------------------------------------------------------
 // Rate Limiting
