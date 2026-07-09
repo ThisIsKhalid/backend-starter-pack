@@ -15,6 +15,7 @@ logs/
 npm-debug.log*
 
 # Uploads
+temp_auto_push.bat
 uploads/
 
 # OS files
@@ -22,7 +23,6 @@ uploads/
 Thumbs.db
 
 # IDE
-.vscode/settings.json
 .idea/
 
 # Testing
@@ -34,3 +34,5 @@ coverage/
 # TypeScript
 *.tsbuildinfo
 
+.gitignore
+branch_structure.json
