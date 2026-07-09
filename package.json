@@ -29,7 +29,6 @@
   "homepage": "https://github.com/ThisIsKhalid/backend-starter-pack#readme",
   "dependencies": {
     "@prisma/client": "^6.19.2",
-    "@types/node": "^25.0.8",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
@@ -52,6 +51,7 @@
     "zod": "^4.3.5"
   },
   "devDependencies": {
+    "@types/node": "^25.0.8",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

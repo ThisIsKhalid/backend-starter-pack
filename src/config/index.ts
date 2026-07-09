@@ -1,59 +1,133 @@
 import dotenv from "dotenv";
 import path from "path";
+import { z } from "zod";
 
+// ---------------------------------------------------------------------------
+// Load .env before validation so process.env is populated
+// ---------------------------------------------------------------------------
 dotenv.config({
   path: path.join(process.cwd(), ".env"),
 });
 
-const REQUIRED_ENV_VARS = [
-  "DATABASE_URL",
-  "JWT_SECRET",
-  "JWT_REFRESH_SECRET",
-  "JWT_RESET_SECRET",
-] as const;
+// ---------------------------------------------------------------------------
+// Schema
+// ---------------------------------------------------------------------------
 
-const missingVars = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);
-if (missingVars.length > 0) {
-  console.error(`❌ Missing required environment variables: ${missingVars.join(", ")}`);
-  process.exit(1);
+const envSchema = z
+  .object({
+    // ---- Core ----
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    PORT: z.coerce.number().int().min(1).max(65535).default(8000),
+    HOST: z.string().min(1).default("0.0.0.0"),
+
+    // ---- App ----
+    APP_NAME: z.string().default("Backend Starter Pack"),
+    APP_VERSION: z.string().default("1.0.0"),
+    FRONTEND_URL: z.string().url().default("http://localhost:3000"),
+    BACKEND_URL: z.string().url().default("http://localhost:8000"),
+
+    PASSWORD_SALT: z.coerce.number().int().min(4).max(20).default(12),
+
+    // ---- JWT ----
+    JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
+    JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),
+    JWT_RESET_SECRET: z.string().min(32, "JWT_RESET_SECRET must be at least 32 characters"),
+    JWT_EXPIRES_IN: z.string().default("15m"),
+    JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
+
+    // ---- Redis ----
+    REDIS_HOST: z.string().min(1).default("127.0.0.1"),
+    REDIS_PORT: z.coerce.number().int().min(1).max(65535).default(6379),
+    REDIS_PASSWORD: z.string().optional(),
+
+    // ---- Email ----
+    EMAIL_SENDER_EMAIL: z.string().email("EMAIL_SENDER_EMAIL must be a valid email"),
+    EMAIL_SENDER_APP_PASS: z.string().min(1, "EMAIL_SENDER_APP_PASS is required"),
+
+    // ---- CORS ----
+    CORS_ORIGIN: z.string().default("*"),
+
+    // ---- Rate Limiting ----
+    RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).max(86_400_000).default(900_000),
+    RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(10_000).default(100),
+    RATE_LIMIT_AUTH_MAX: z.coerce.number().int().min(1).max(1_000).default(10),
+  })
+  .refine((data) => data.JWT_SECRET !== data.JWT_REFRESH_SECRET, {
+    message: "JWT_SECRET and JWT_REFRESH_SECRET must be different",
+    path: ["JWT_REFRESH_SECRET"],
+  })
+  .refine((data) => data.JWT_SECRET !== data.JWT_RESET_SECRET, {
+    message: "JWT_SECRET and JWT_RESET_SECRET must be different",
+    path: ["JWT_RESET_SECRET"],
+  })
+  .refine((data) => data.JWT_REFRESH_SECRET !== data.JWT_RESET_SECRET, {
+    message: "JWT_REFRESH_SECRET and JWT_RESET_SECRET must be different",
+    path: ["JWT_RESET_SECRET"],
+  })
+  .refine((data) => !(data.NODE_ENV === "production" && data.CORS_ORIGIN === "*"), {
+    message: "CORS_ORIGIN cannot be '*' in production — set an explicit origin",
+    path: ["CORS_ORIGIN"],
+  });
+
+// ---------------------------------------------------------------------------
+// Validate
+// ---------------------------------------------------------------------------
+
+export type Env = z.infer<typeof envSchema>;
+
+let parsed: Env;
+
+try {
+  parsed = envSchema.parse(process.env);
+} catch (err) {
+  if (err instanceof z.ZodError) {
+    const formatted = err.issues.map((i) => `  • ${i.path.join(".")}: ${i.message}`).join("\n");
+    console.error(`❌ Configuration errors:\n${formatted}`);
+    process.exit(1);
+  }
+  throw err;
 }
 
+// ---------------------------------------------------------------------------
+// Typed config object (consumed by the rest of the app)
+// ---------------------------------------------------------------------------
+
 const config = {
-  env: process.env.NODE_ENV || "development",
-  port: Number(process.env.PORT) || 8000,
-  host: process.env.HOST || "0.0.0.0",
+  env: parsed.NODE_ENV,
+  port: parsed.PORT,
+  host: parsed.HOST,
   app: {
-    name: process.env.APP_NAME || "Backend Starter Pack",
-    version: process.env.APP_VERSION || "1.0.0",
-    frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
-    backendUrl: process.env.BACKEND_URL || "http://localhost:8000",
+    name: parsed.APP_NAME,
+    version: parsed.APP_VERSION,
+    frontendUrl: parsed.FRONTEND_URL,
+    backendUrl: parsed.BACKEND_URL,
   },
-  password_salt: Number(process.env.PASSWORD_SALT) || 12,
+  password_salt: parsed.PASSWORD_SALT,
   jwt: {
-    secret: process.env.JWT_SECRET as string,
-    refreshSecret: process.env.JWT_REFRESH_SECRET as string,
-    resetSecret: process.env.JWT_RESET_SECRET as string,
-    expiresIn: process.env.JWT_EXPIRES_IN || "15m",
-    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d",
-    resetExpiresIn: "10m",
+    secret: parsed.JWT_SECRET,
+    refreshSecret: parsed.JWT_REFRESH_SECRET,
+    resetSecret: parsed.JWT_RESET_SECRET,
+    expiresIn: parsed.JWT_EXPIRES_IN,
+    refreshExpiresIn: parsed.JWT_REFRESH_EXPIRES_IN,
+    resetExpiresIn: "10m" as const,
   },
   redis: {
-    host: process.env.REDIS_HOST || "127.0.0.1",
-    port: Number(process.env.REDIS_PORT) || 6379,
-    password: process.env.REDIS_PASSWORD || undefined,
+    host: parsed.REDIS_HOST,
+    port: parsed.REDIS_PORT,
+    password: parsed.REDIS_PASSWORD,
   },
   emailSender: {
-    email: process.env.EMAIL_SENDER_EMAIL || "",
-    app_pass: process.env.EMAIL_SENDER_APP_PASS || "",
+    email: parsed.EMAIL_SENDER_EMAIL,
+    app_pass: parsed.EMAIL_SENDER_APP_PASS,
   },
   cors: {
-    origin: process.env.CORS_ORIGIN || "*",
+    origin: parsed.CORS_ORIGIN,
   },
   rateLimit: {
-    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-    max: Number(process.env.RATE_LIMIT_MAX) || 100,
-    authMax: Number(process.env.RATE_LIMIT_AUTH_MAX) || 10,
+    windowMs: parsed.RATE_LIMIT_WINDOW_MS,
+    max: parsed.RATE_LIMIT_MAX,
+    authMax: parsed.RATE_LIMIT_AUTH_MAX,
   },
-};
+} as const;
 
 export default config;
