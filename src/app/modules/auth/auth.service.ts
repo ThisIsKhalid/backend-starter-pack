@@ -103,8 +103,9 @@ const createAndSendOtp = async (email: string, purpose: OtpPurpose, userId: stri
 // ---------------------------------------------------------------------------
 
 const register = async (userData: IUser) => {
+  const email = userData.email.toLowerCase();
   const existing = await prisma.user.findUnique({
-    where: { email: userData.email },
+    where: { email },
   });
   if (existing) {
     throw new ApiError(httpStatus.CONFLICT, "Email is already registered.");
@@ -114,7 +115,7 @@ const register = async (userData: IUser) => {
 
   const user = await prisma.user.create({
     data: {
-      email: userData.email,
+      email,
       name: userData.name,
       password: hashedPassword,
     },
@@ -128,8 +129,9 @@ const register = async (userData: IUser) => {
 };
 
 const login = async (loginData: ILoginInput, meta: RefreshTokenMeta = {}) => {
+  const email = loginData.email.toLowerCase();
   const user = await prisma.user.findUnique({
-    where: { email: loginData.email },
+    where: { email },
   });
 
   if (!user) {
@@ -306,7 +308,8 @@ const logout = async (accessToken: string, refreshToken?: string) => {
   }
 };
 
-const verifyEmail = async ({ email, otp, ip }: IVerifyEmailInput & { ip?: string }) => {
+const verifyEmail = async ({ email: rawEmail, otp, ip }: IVerifyEmailInput & { ip?: string }) => {
+  const email = rawEmail.toLowerCase();
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found.");
@@ -374,7 +377,8 @@ const verifyEmail = async ({ email, otp, ip }: IVerifyEmailInput & { ip?: string
   ]);
 };
 
-const resendOtp = async ({ email, purpose }: IResendOtpInput) => {
+const resendOtp = async ({ email: rawEmail, purpose }: IResendOtpInput) => {
+  const email = rawEmail.toLowerCase();
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found.");
@@ -387,7 +391,8 @@ const resendOtp = async ({ email, purpose }: IResendOtpInput) => {
   await createAndSendOtp(email, purpose as OtpPurpose, user.id);
 };
 
-const forgotPassword = async ({ email }: IForgotPasswordInput) => {
+const forgotPassword = async ({ email: rawEmail }: IForgotPasswordInput) => {
+  const email = rawEmail.toLowerCase();
   const user = await prisma.user.findUnique({ where: { email } });
   // Return success even if user not found (security: don't confirm email existence)
   if (!user) return;
@@ -395,7 +400,8 @@ const forgotPassword = async ({ email }: IForgotPasswordInput) => {
   await createAndSendOtp(email, OtpPurpose.PASSWORD_RESET, user.id);
 };
 
-const verifyOtp = async ({ email, otp, ip }: IVerifyOtpInput & { ip?: string }) => {
+const verifyOtp = async ({ email: rawEmail, otp, ip }: IVerifyOtpInput & { ip?: string }) => {
+  const email = rawEmail.toLowerCase();
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found.");
