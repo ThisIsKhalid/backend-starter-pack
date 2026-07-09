@@ -46,11 +46,6 @@ const envSchema = z
 
     // ---- CORS ----
     CORS_ORIGIN: z.string().default("*"),
-
-    // ---- Rate Limiting ----
-    RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).max(86_400_000).default(900_000),
-    RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(10_000).default(100),
-    RATE_LIMIT_AUTH_MAX: z.coerce.number().int().min(1).max(1_000).default(10),
   })
   .refine((data) => data.JWT_SECRET !== data.JWT_REFRESH_SECRET, {
     message: "JWT_SECRET and JWT_REFRESH_SECRET must be different",
@@ -122,11 +117,6 @@ const config = {
   },
   cors: {
     origin: parsed.CORS_ORIGIN,
-  },
-  rateLimit: {
-    windowMs: parsed.RATE_LIMIT_WINDOW_MS,
-    max: parsed.RATE_LIMIT_MAX,
-    authMax: parsed.RATE_LIMIT_AUTH_MAX,
   },
 } as const;
 

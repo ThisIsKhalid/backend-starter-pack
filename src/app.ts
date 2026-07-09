@@ -1,13 +1,14 @@
 import cors from "cors";
 import express, { Application, NextFunction, Request, Response } from "express";
-import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import hpp from "hpp";
 import path from "path";
 import responseTime from "response-time";
 import GlobalErrorHandler from "./app/middlewares/globalErrorHandler";
+import { rateLimiter } from "./app/middlewares/rateLimiter";
 import router from "./app/routes";
 import config from "./config";
+import { anonymousPolicy } from "./config/rateLimitPolicies";
 import prisma from "./lib/prisma";
 import { setupSwagger } from "./lib/swagger";
 import logger from "./utils/logger/logger";
@@ -56,43 +57,6 @@ app.use(express.static("public"));
 
 // app.use("/uploads", express.static(path.join("/var/www/uploads")));
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads"))); // Serve static files from the "uploads" directory
-
-// ---------------------------------------------------------------------------
-// Rate Limiting
-// ---------------------------------------------------------------------------
-
-// General rate limiter
-const generalLimiter = rateLimit({
-  windowMs: config.rateLimit.windowMs,
-  max: config.rateLimit.max,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: "Too many requests, please try again later.",
-  },
-});
-
-// Strict limiter for auth endpoints (login, register, forgot-password)
-const authLimiter = rateLimit({
-  windowMs: config.rateLimit.windowMs,
-  max: config.rateLimit.authMax,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: "Too many authentication attempts, please try again later.",
-  },
-});
-
-app.use("/api", generalLimiter);
-app.use("/api/v1/auth/login", authLimiter);
-app.use("/api/v1/auth/register", authLimiter);
-app.use("/api/v1/auth/forgot-password", authLimiter);
-app.use("/api/v1/auth/resend-otp", authLimiter);
-app.use("/api/v1/auth/verify-otp", authLimiter);
-app.use("/api/v1/auth/verify-email", authLimiter);
-app.use("/api/v1/auth/reset-password", authLimiter);
 
 // ---------------------------------------------------------------------------
 // Request Logging
