@@ -108,4 +108,30 @@ export const resetOtpAttempts = async (userId: string, purpose: string): Promise
 
 export { OTP_IP_MAX, OTP_MAX_ATTEMPTS };
 
+// ---------------------------------------------------------------------------
+// Password-reset token helpers (single-use server-side storage)
+// ---------------------------------------------------------------------------
+
+const RESET_TOKEN_PREFIX = "reset:";
+const RESET_TOKEN_TTL = 10 * 60; // 10 minutes — matches JWT expiry
+
+/** Store a reset-token hash in Redis so it can only be consumed once. */
+export const storeResetToken = async (tokenHash: string, userId: string): Promise<void> => {
+  const key = `${RESET_TOKEN_PREFIX}${tokenHash}`;
+  await redis.set(key, userId, "EX", RESET_TOKEN_TTL);
+};
+
+/**
+ * Atomically consume a reset token: returns the userId if the token
+ * exists and has NOT been used yet, otherwise returns null.
+ * Uses GET + DEL as an atomic single-use gate.
+ */
+export const consumeResetToken = async (tokenHash: string): Promise<string | null> => {
+  const key = `${RESET_TOKEN_PREFIX}${tokenHash}`;
+  const userId = await redis.get(key);
+  if (!userId) return null;
+  await redis.del(key);
+  return userId;
+};
+
 export default redis;

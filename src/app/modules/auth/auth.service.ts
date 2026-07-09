@@ -7,6 +7,7 @@ import emailSender from "../../../helpers/email_sender/emailSender";
 import prisma from "../../../lib/prisma";
 import {
   blacklistToken,
+  consumeResetToken,
   incrementOtpAttempts,
   incrementOtpIpAttempts,
   isOtpOnCooldown,
@@ -15,6 +16,7 @@ import {
   OTP_MAX_ATTEMPTS,
   resetOtpAttempts,
   setOtpCooldown,
+  storeResetToken,
 } from "../../../lib/redisConnection";
 import { otpEmail } from "../../../shared/emails/otpEmail";
 import { passwordResetEmail } from "../../../shared/emails/passwordResetEmail";
@@ -403,20 +405,51 @@ const verifyOtp = async ({ email, otp, ip }: IVerifyOtpInput & { ip?: string }) 
     data: { used: true },
   });
 
-  const resetToken = jwtHelpers.generateToken({ email: user.email }, config.jwt.secret, "10m");
+  // --- Issue a single-use, purpose-scoped reset token ---
+  const jti = crypto.randomUUID();
+  const resetToken = jwtHelpers.generateToken(
+    {
+      sub: user.id,
+      email: user.email,
+      purpose: "PASSWORD_RESET",
+      jti,
+    },
+    config.jwt.resetSecret,
+    config.jwt.resetExpiresIn
+  );
+
+  // Store token hash server-side so it can only be consumed once
+  await storeResetToken(hashToken(resetToken), user.id);
 
   return { resetToken };
 };
 
 const resetPassword = async ({ resetToken, newPassword }: IResetPasswordInput) => {
-  let decoded: { email: string };
+  // 1. Verify JWT signature + claims
+  let decoded: { sub: string; email: string; purpose: string; jti: string };
   try {
-    decoded = jwtHelpers.verifyToken(resetToken, config.jwt.secret) as { email: string };
+    decoded = jwtHelpers.verifyToken(resetToken, config.jwt.resetSecret) as {
+      sub: string;
+      email: string;
+      purpose: string;
+      jti: string;
+    };
   } catch {
     throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid or expired reset token.");
   }
 
-  const user = await prisma.user.findUnique({ where: { email: decoded.email } });
+  if (decoded.purpose !== "PASSWORD_RESET") {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid token purpose.");
+  }
+
+  // 2. Consume token atomically — fails if already used or expired
+  const tokenUserId = await consumeResetToken(hashToken(resetToken));
+  if (!tokenUserId || tokenUserId !== decoded.sub) {
+    throw new ApiError(httpStatus.UNAUTHORIZED, "Reset token has already been used or is invalid.");
+  }
+
+  // 3. Apply the password change
+  const user = await prisma.user.findUnique({ where: { id: decoded.sub } });
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found.");
   }

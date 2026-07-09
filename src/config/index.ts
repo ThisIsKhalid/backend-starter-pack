@@ -5,7 +5,12 @@ dotenv.config({
   path: path.join(process.cwd(), ".env"),
 });
 
-const REQUIRED_ENV_VARS = ["DATABASE_URL", "JWT_SECRET", "JWT_REFRESH_SECRET"] as const;
+const REQUIRED_ENV_VARS = [
+  "DATABASE_URL",
+  "JWT_SECRET",
+  "JWT_REFRESH_SECRET",
+  "JWT_RESET_SECRET",
+] as const;
 
 const missingVars = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);
 if (missingVars.length > 0) {
@@ -27,8 +32,10 @@ const config = {
   jwt: {
     secret: process.env.JWT_SECRET as string,
     refreshSecret: process.env.JWT_REFRESH_SECRET as string,
+    resetSecret: process.env.JWT_RESET_SECRET as string,
     expiresIn: process.env.JWT_EXPIRES_IN || "15m",
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d",
+    resetExpiresIn: "10m",
   },
   redis: {
     host: process.env.REDIS_HOST || "127.0.0.1",
