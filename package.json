@@ -14,7 +14,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "ts-node src/app/db/seed.ts"
+    "prisma:seed": "ts-node src/app/db/seed.ts",
+    "db:ttl-indexes": "npx tsx src/app/db/ensure-ttl-indexes.ts"
   },
   "repository": {
     "type": "git",
@@ -57,7 +58,7 @@
     "@types/ioredis": "^4.28.10",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.0.0",
-    "@types/node": "^25.0.8",
+    "@types/node": "^25.9.5",
     "@types/nodemailer": "^7.0.5",
     "@types/response-time": "^2.3.9",
     "@types/swagger-jsdoc": "^6.0.4",
@@ -66,6 +67,7 @@
     "@typescript-eslint/parser": "^8.57.0",
     "eslint": "^10.0.3",
     "eslint-config-prettier": "^10.1.8",
+    "mongodb": "^7.5.0",
     "prettier": "^3.8.1",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.3"

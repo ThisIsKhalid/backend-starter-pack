@@ -25,6 +25,7 @@ const envSchema = z
     APP_VERSION: z.string().default("1.0.0"),
     FRONTEND_URL: z.string().url().default("http://localhost:3000"),
     BACKEND_URL: z.string().url().default("http://localhost:8000"),
+    DATABASE_URL: z.string().url().min(1, "DATABASE_URL is required"),
 
     PASSWORD_SALT: z.coerce.number().int().min(4).max(20).default(12),
 
@@ -96,6 +97,7 @@ const config = {
     version: parsed.APP_VERSION,
     frontendUrl: parsed.FRONTEND_URL,
     backendUrl: parsed.BACKEND_URL,
+    databaseUrl: parsed.DATABASE_URL,
   },
   password_salt: parsed.PASSWORD_SALT,
   jwt: {

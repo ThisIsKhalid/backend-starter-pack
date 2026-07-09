@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import config from "../../config";
 import prisma from "../../lib/prisma";
-import logger from "../../utils/logger/logger";
+import logger from "../logger/logger";
 
 // ---------------------------------------------------------------------------
 // Singleton transporter — created once, reused for every message

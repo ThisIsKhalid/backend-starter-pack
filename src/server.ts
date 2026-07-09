@@ -1,10 +1,11 @@
 import { Server } from "http";
 import app from "./app";
 import config from "./config";
-import { startEmailWorker, stopEmailWorker } from "./helpers/email_sender/emailWorker";
 import prisma from "./lib/prisma";
 import redis from "./lib/redisConnection";
 import logger from "./utils/logger/logger";
+import { startEmailWorker, stopEmailWorker } from "./utils/workers/emailWorker";
+import { startCleanupWorker, stopCleanupWorker } from "./utils/workers/cleanupWorker";
 
 let server: Server;
 
@@ -17,8 +18,9 @@ async function main() {
     // 2. Connect to Redis
     await redis.connect();
 
-    // 3. Start email delivery worker
+    // 3. Start background workers
     startEmailWorker();
+    startCleanupWorker();
 
     // 4. Start HTTP server
     server = app.listen(config.port, config.host, () => {
@@ -55,6 +57,9 @@ const gracefulShutdown = async (signal: string) => {
 
       stopEmailWorker();
       logger.info("Email worker stopped.");
+
+      stopCleanupWorker();
+      logger.info("Cleanup worker stopped.");
 
       try {
         await prisma.$disconnect();

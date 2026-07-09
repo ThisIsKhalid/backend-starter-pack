@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
 enum Role {
   USER
   ADMIN
@@ -17,6 +21,17 @@ enum OtpPurpose {
   EMAIL_VERIFICATION
   PASSWORD_RESET
 }
+
+enum EmailJobStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
+// ---------------------------------------------------------------------------
+// User
+// ---------------------------------------------------------------------------
 
 model User {
   id              String    @id @default(auto()) @map("_id") @db.ObjectId
@@ -35,6 +50,15 @@ model User {
   refreshTokens RefreshToken[]
 }
 
+// ---------------------------------------------------------------------------
+// OTP tokens — compound index for the hot-path lookup
+//   findMany({ where: { userId, purpose, used: false, expiresAt: { gt: now } } })
+//
+// TTL index on expiresAt: MongoDB automatically deletes documents after
+// expiry.  The TTL worker (src/workers/cleanupWorker.ts) provides an
+// additional safety net for edge cases.
+// ---------------------------------------------------------------------------
+
 model OtpToken {
   id        String     @id @default(auto()) @map("_id") @db.ObjectId
   userId    String     @db.ObjectId
@@ -43,37 +67,42 @@ model OtpToken {
   expiresAt DateTime
   used      Boolean    @default(false)
   createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
+  @@index([userId, purpose, used, expiresAt])
 }
+
+// ---------------------------------------------------------------------------
+// Refresh tokens — indexed for rotation lookups, family revocation,
+// and cleanup of expired / revoked sessions.
+// ---------------------------------------------------------------------------
 
 model RefreshToken {
-  id        String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String    @db.ObjectId
-  tokenHash String    @unique
-  jti       String
-  familyId  String
-  expiresAt DateTime
-  revokedAt DateTime?
-  userAgent String?
-  ip        String?
-  createdAt DateTime  @default(now())
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String    @db.ObjectId
+  tokenHash  String    @unique
+  jti        String
+  familyId   String
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  userAgent  String?
+  ip         String?
+  createdAt  DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
   @@index([jti])
   @@index([familyId])
+  @@index([userId, revokedAt])
 }
 
-enum EmailJobStatus {
-  PENDING
-  PROCESSING
-  SENT
-  FAILED
-}
+// ---------------------------------------------------------------------------
+// Email job queue — compound index for the worker's poll query
+//   findMany({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" } })
+// ---------------------------------------------------------------------------
 
 model EmailJob {
   id          String         @id @default(auto()) @map("_id") @db.ObjectId
@@ -87,8 +116,12 @@ model EmailJob {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
-  @@index([status])
+  @@index([status, createdAt])
 }
+
+// ---------------------------------------------------------------------------
+// Post — compound index for author-scoped queries
+// ---------------------------------------------------------------------------
 
 model Post {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
@@ -99,4 +132,7 @@ model Post {
   authorId  String   @db.ObjectId
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([authorId])
+  @@index([authorId, createdAt])
 }
